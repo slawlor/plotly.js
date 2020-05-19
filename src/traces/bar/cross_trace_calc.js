@@ -143,10 +143,20 @@ function initBase(sa, calcTraces) {
         // time. But included here for completeness.
         var scalendar = trace.orientation === 'h' ? trace.xcalendar : trace.ycalendar;
 
-        // 'base' on categorical axes makes no sense
-        var d2c = sa.type === 'category' || sa.type === 'multicategory' ?
-            function() { return null; } :
-            sa.d2c;
+        var d2c = function(x) {
+            if(sa.type === 'category' || sa.type === 'multicategory') {
+                // 'base' on categorical axes makes no sense
+                return null;
+            }
+
+            var out = sa.d2c(x);
+            if(sa.type === 'date' && isNumeric(x)) {
+                // see issue #4558 until date changes in v2
+                out -= sa.d2c('1970-01-01');
+            }
+
+            return out;
+        };
 
         if(isArrayOrTypedArray(base)) {
             for(j = 0; j < Math.min(base.length, cd.length); j++) {
