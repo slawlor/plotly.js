@@ -145,7 +145,7 @@ module.exports = function handleAxisDefaults(containerIn, containerOut, coerce, 
 
                 if(brk.pattern === HOUR) {
                     containerOut._hasHourBreaks = true;
-                    containerOut._dayHours = Math.round((brk.bounds[1] - brk.bounds[0] + 24) % 24);
+                    containerOut._dayHours = ((brk.bounds[1] - brk.bounds[0] + 24) % 24);
                     n++;
                 }
 
