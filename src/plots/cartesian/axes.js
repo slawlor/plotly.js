@@ -790,7 +790,7 @@ axes.autoTicks = function(ax, roughDTick) {
         } else if(roughX2 > ONEAVGMONTH) {
             roughDTick /= ONEAVGMONTH;
             ax.dtick = 'M' + roundDTick(roughDTick, 1, roundBase24);
-        } else if(roughX2 > ONEDAY) {
+        } else if(roughX2 > oneDay) {
             ax.dtick = roundDTick(roughDTick, oneDay, ax._hasDayOfWeekBreaks ?
                 [1, 2 * dayRatio, 7 * dayRatio, 14 * dayRatio] :
                 roundDays
@@ -801,7 +801,7 @@ axes.autoTicks = function(ax, roughDTick) {
             // 2 or 3 days... but that's a weird enough case that we'll ignore it.
             ax.tick0 = Lib.dateTick0(ax.calendar, true);
         } else if(roughX2 > ONEHOUR) {
-            ax.dtick = roundDTick(roughDTick, ONEHOUR, roundBase24);
+            ax.dtick = roundDTick(roughDTick, (ax._hasHourBreaks ? 2 : 1) * ONEHOUR, roundBase24);
         } else if(roughX2 > ONEMIN) {
             ax.dtick = roundDTick(roughDTick, ONEMIN, roundBase60);
         } else if(roughX2 > ONESEC) {
