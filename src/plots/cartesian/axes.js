@@ -638,7 +638,8 @@ axes.calcTicks = function calcTicks(ax) {
                 if(ax.maskBreaks(tickVal.value) === BADNUM) {
                     tickVal.value = moveOutsideBreak(tickVal.value, ax);
 
-                    if(ax._rl && tickVal.value === ax._rl[1]) continue;
+                    var o = tickVal.value / ONEHOUR;
+                    if(o !== Math.round(o)) continue;
                 }
 
                 var pos = ax.c2p(tickVal.value);
@@ -970,10 +971,6 @@ axes.tickFirst = function(ax) {
     var r0 = expandRange(rng)[0];
     var dtick = ax.dtick;
     var tick0 = r2l(ax.tick0);
-
-    if(ax.tickmode === 'auto' && ax.rangebreaks && ax.maskBreaks(tick0) === BADNUM) {
-        tick0 = moveOutsideBreak(tick0, ax);
-    }
 
     if(isNumeric(dtick)) {
         var tmin = sRound((r0 - tick0) / dtick) * dtick + tick0;
