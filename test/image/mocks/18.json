@@ -5561,6 +5561,7 @@
             "nticks": 0,
             "ticks": "",
             "showticklabels": true,
+            "spikePersistOnClick": true,
             "tick0": 0,
             "dtick": 2,
             "ticklen": 5,
