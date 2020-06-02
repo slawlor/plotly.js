@@ -78,7 +78,7 @@ drawing.translatePoint = function(d, sel, xa, ya, gd) {
         if(sel.node().nodeName === 'text') {
             sel.attr('x', x).attr('y', y);
         } else {
-            if (gd !== undefined && gd !== null) updateSpikeLines(gd, sel, d.x, d.y, x, y, xa, ya);
+            if (gd !== undefined && gd !== null) updateSpikeLines(gd, sel, d.x, d.y, d.i, x, y, xa, ya);
             sel.attr('transform', 'translate(' + x + ',' + y + ')');
         }
     } else {
@@ -1187,7 +1187,7 @@ drawing.setTextPointsScale = function(selection, xScale, yScale) {
 }
 
 // Update spikeline for a given points (When the graph has points, then we will call this per point)
-function updateSpikeLines(gd, sel, px, py, x, y, xAxis, yAxis){
+function updateSpikeLines(gd, sel, px, py, pNumber, x, y, xAxis, yAxis){
     if (gd === null || gd === undefined) return;
 
     var previousDx = 0;
@@ -1207,11 +1207,11 @@ function updateSpikeLines(gd, sel, px, py, x, y, xAxis, yAxis){
     var dx = x - previousDx;
     var dy = y - previousDy;
 
-    drawing.repositionPersistentSpikeLines(gd, px, py, dx, dy, xAxis, yAxis);
+    drawing.repositionPersistentSpikeLines(gd, px, py, pNumber, dx, dy, xAxis, yAxis);
 }
 
 // Reposition spikeline for a given points (When the graph has points, then we will call this per point)
-drawing.repositionPersistentSpikeLines = function(gd, px, py, dx, dy, xAxis, yAxis){
+drawing.repositionPersistentSpikeLines = function(gd, px, py, pNumber, dx, dy, xAxis, yAxis){
     if (gd === null || gd === undefined) return;
 
     var xSpikes = [];
@@ -1224,7 +1224,8 @@ drawing.repositionPersistentSpikeLines = function(gd, px, py, dx, dy, xAxis, yAx
     var spikeLines = gd._fullLayout._hoverlayer.selectAll('.spikeline')
         .filter('.' + plotId)
         .filter('[px ="' + px + '"]')
-        .filter('[py ="' + py + '"]');
+        .filter('[py ="' + py + '"]')
+        .filter('[pNumber ="' + pNumber + '"]');
 
     var filteredXSpikes = spikeLines.filter('.'+ xAxis._name);
     for(var index = 0; index < filteredXSpikes[0].length; index++){

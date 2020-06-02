@@ -2245,10 +2245,9 @@ axes.makeTransFn = function(ax) {
 axes.makeTransFn2 = function(gd, ax, subAx) {
     var axLetter = ax._id.charAt(0);
     var offset = ax._offset;
-    var subOffset = subAx._offset;
     return axLetter === 'x' ?
         function(d) { 
-            var offSet = getLabelOffsetHeight(gd, ax._id, subAx._id, ax._mainLinePosition, d.fontSize);
+            var offSet = getLabelOffsetHeight(gd, ax._id, subAx._id, ax._mainLinePosition, d.fontSize, subAx._length);
             return 'translate(' + (offset + ax.l2p(d.x)) + ',' + offSet + ')'; 
         } :
         function(d) { return 'translate(0,' + (offset + ax.l2p(d.x)) + ')'; };
@@ -3215,23 +3214,12 @@ function isAngular(ax) {
     return ax._id === 'angularaxis';
 }
 
-function getLabelOffsetHeight(gd, xAxisId, yAxisId, mainLinePosition, fontSize){
-
+function getLabelOffsetHeight(gd, xAxisId, yAxisId, mainLinePosition, fontSize, plotHeight) {
     var plotId = xAxisId + yAxisId;
     var plotPositionY = gd._fullLayout._plots[plotId].plot[0][0].transform.animVal[0].matrix.f;
-
-    var plotHeight = 0;
-    var siblings = gd._fullLayout._plots.xy.plot[0][0].parentNode.childNodes;
-    for (var i = 0; i < siblings.length; i++) {
-        var node = siblings[i];
-        if (node.className.baseVal === "gridlayer" || node.className.animVal === "gridlayer") {
-          plotHeight = node.getBoundingClientRect().height;
-        }        
-    }
-
-    return (plotHeight + plotPositionY) - mainLinePosition - fontSize/2;
+    return (plotHeight + plotPositionY) - mainLinePosition - fontSize / 2;
 }
 
-function buildLabelingFunc(gd, ax, opts){
-    return function(){axes.drawLabels(gd, ax, opts)};
+function buildLabelingFunc(gd, ax, opts) {
+    return function() { axes.drawLabels(gd, ax, opts); };
 }
