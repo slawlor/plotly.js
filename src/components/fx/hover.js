@@ -79,6 +79,77 @@ exports.hover = function hover(gd, evt, subplot, noHoverEvent) {
     );
 };
 
+exports.removeNonPersistentSpikeLines = removeNonPersistentSpikeLines;
+exports.repositionPersistentSpikeLinesOnDrag = repositionPersistentSpikeLinesOnDrag;
+exports.cachedSpikeLinesPositions = cachedSpikeLinesPositions;
+
+exports.toggleSpikeLinesPresistency = function toggleSpikeLinesPresistency(gd){   
+    if (gd === null || gd === undefined) return;
+    
+    var hoverData = gd._hoverdata[0];
+    if(hoverData === null || hoverData === undefined) return;
+
+    var xAxisName = hoverData.xaxis._name;
+    var yAxisName = hoverData.yaxis._name;
+    var xAxis = gd._fullLayout[xAxisName];
+    var yAxis = gd._fullLayout[yAxisName];
+
+    var subPlotName = xAxis._id + yAxis._id;
+    var subPlot = gd._fullLayout._plots[subPlotName];
+    if (subPlot === undefined) return;
+
+    if (subPlot._persistentXSpikeLine === undefined) subPlot._persistentXSpikeLine = false;
+    if (subPlot._persistentYSpikeLine === undefined) subPlot._persistentYSpikeLine = false;
+    
+    if (xAxis.spikePersistOnClick || yAxis.spikePersistOnClick){
+
+        if (subPlot._persistentXSpikeLine || subPlot._persistentYSpikeLine){
+            subPlot._persistentXSpikeLine = false;
+            subPlot._persistentYSpikeLine = false;
+        }
+        else{
+            var gs = gd._fullLayout._size;
+            if(xAxis.spikePersistOnClick){
+                var x1 = gs.l;
+                var x2 = gs.l + gs.w;
+                
+                var spikeLines = gd._fullLayout._hoverlayer.selectAll('line').filter('.spikeline').filter('.'+subPlotName).filter('.'+xAxisName);
+                if (spikeLines === undefined || spikeLines === null || spikeLines.length <= 0) return;
+                for(var i = 0; i < spikeLines[0].length; i++){
+                    var line = spikeLines[0][i]
+                    line.attributes.x1.value = x1;
+                    line.attributes.x2.value = x2;
+                }
+
+                subPlot._persistentXSpikeLine = true;
+            } 
+            if(yAxis.spikePersistOnClick){
+                var y1 = gs.t;
+                var y2 = gs.t + gs.h;
+                
+                var spikeLines = gd._fullLayout._hoverlayer.selectAll('line').filter('.spikeline').filter('.'+subPlotName).filter('.'+yAxisName);
+                if (spikeLines === undefined || spikeLines === null || spikeLines.length <= 0) return;
+                for(var i = 0; i < spikeLines[0].length; i++){
+                    var line = spikeLines[0][i]
+                    line.attributes.y1.value = y1;
+                    line.attributes.y2.value = y2;
+                }
+
+                subPlot._persistentYSpikeLine = true;
+            } 
+        }
+    }        
+}
+
+exports.removePlotSpikeLines = function removePlotSpikeLines(gd, plotId){
+    removeSpikeLines(gd, false, plotId);
+}
+exports.resetSpikeLines = function resetSpikeLines(gd){
+    // maybe need to loop all axis and cancel, if not delete this
+    removeSpikeLines(gd, false);
+}
+
+
 /*
  * Draw a single hover item or an array of hover item in a pre-existing svg container somewhere
  * hoverItem should have keys:
@@ -575,7 +646,9 @@ function _hover(gd, evt, subplot, noHoverEvent) {
             spikeDistance: point.spikeDistance,
             curveNumber: point.trace.index,
             color: point.color,
-            pointNumber: point.index
+            pointNumber: point.index,
+            xVal : point.xLabelVal,
+            yVal : point.yLabelVal,
         };
     }
 
@@ -1640,6 +1713,8 @@ function cleanPoint(d, hovermode) {
 }
 
 function createSpikelines(gd, closestPoints, opts) {
+    var vLinePoint = closestPoints.vLinePoint;
+    var hLinePoint = closestPoints.hLinePoint;
     var container = opts.container;
     var fullLayout = opts.fullLayout;
     var gs = fullLayout._size;
@@ -1649,16 +1724,37 @@ function createSpikelines(gd, closestPoints, opts) {
 
     var xa, ya;
 
+    if(vLinePoint !== null && vLinePoint !== undefined){
+        var xAxisName = vLinePoint.xa._name;
+        var yAxisName = vLinePoint.ya._name;
+        var xAxis = gd._fullLayout[xAxisName];
+        var yAxis = gd._fullLayout[yAxisName];
+
+        var subPlotName = xAxis._id + yAxis._id;
+        var subPlot = gd._fullLayout._plots[subPlotName];
+        if (subPlot === undefined) return;
+
+        if (subPlot._persistentXSpikeLine && xAxis.spikePersistOnClick || subPlot._persistentYSpikeLine && yAxis.spikePersistOnClick) return;
+    }
+
     // Remove old spikeline items
-    container.selectAll('.spikeline').remove();
+    removeNonPersistentSpikeLines(gd);
 
     if(!(showX || showY)) return;
 
+    var vLine = closestPoints.vLinePoint;
+    var xAxisName = vLine.xa._name;
+    var yAxisName = vLine.ya._name;
+
+    var plotId = vLine.xa._id + vLine.ya._id;
+
     var contrastColor = Color.combine(fullLayout.plot_bgcolor, fullLayout.paper_bgcolor);
+
+    var xValue = hLinePoint.xVal;
+    var yValue = vLinePoint.yVal;
 
     // Horizontal line (to y-axis)
     if(showY) {
-        var hLinePoint = closestPoints.hLinePoint;
         var hLinePointX, hLinePointY;
 
         xa = hLinePoint && hLinePoint.xa;
@@ -1672,6 +1768,11 @@ function createSpikelines(gd, closestPoints, opts) {
             hLinePointX = xa._offset + hLinePoint.x;
             hLinePointY = ya._offset + hLinePoint.y;
         }
+
+        var yRange = ya._rl[1] - ya._rl[0];
+        var yRatio = 1 - ((yValue - ya._rl[0]) / yRange);
+        var y0Height = hLinePointY - (yRatio * ya._length);
+
         var dfltHLineColor = tinycolor.readability(hLinePoint.color, contrastColor) < 1.5 ?
             Color.contrast(contrastColor) : hLinePoint.color;
         var yMode = ya.spikemode;
@@ -1705,9 +1806,14 @@ function createSpikelines(gd, closestPoints, opts) {
                     y2: hLinePointY,
                     'stroke-width': yThickness,
                     stroke: yColor,
-                    'stroke-dasharray': Drawing.dashStyle(ya.spikedash, yThickness)
+                    'stroke-dasharray': Drawing.dashStyle(ya.spikedash, yThickness),
+                    px: xValue,
+                    py: yValue,
+                    y0: y0Height
                 })
                 .classed('spikeline', true)
+                .classed(plotId, true)
+                .classed(xAxisName, true)
                 .classed('crisp', true);
 
             // Background horizontal Line (to y-axis)
@@ -1718,9 +1824,14 @@ function createSpikelines(gd, closestPoints, opts) {
                     y1: hLinePointY,
                     y2: hLinePointY,
                     'stroke-width': yThickness + 2,
-                    stroke: contrastColor
+                    stroke: contrastColor,
+                    px: xValue,
+                    py: yValue,
+                    y0: y0Height
                 })
                 .classed('spikeline', true)
+                .classed(plotId, true)
+                .classed(xAxisName, true)
                 .classed('crisp', true);
         }
         // Y axis marker
@@ -1730,9 +1841,13 @@ function createSpikelines(gd, closestPoints, opts) {
                     cx: xEdge + (ya.side !== 'right' ? yThickness : -yThickness),
                     cy: hLinePointY,
                     r: yThickness,
-                    fill: yColor
+                    fill: yColor,
+                    px: xValue,
+                    py: yValue
                 })
-                .classed('spikeline', true);
+                .classed('spikeline', true)
+                .classed(plotId, true)
+                .classed(yAxisName, true);
         }
     }
 
@@ -1751,6 +1866,10 @@ function createSpikelines(gd, closestPoints, opts) {
             vLinePointX = xa._offset + vLinePoint.x;
             vLinePointY = ya._offset + vLinePoint.y;
         }
+        var xRange = xa._rl[1] - xa._rl[0];
+        var xRatio = (xValue - xa._rl[0]) / xRange;
+        var x0Width = vLinePointX - (xRatio * xa._length);
+
         var dfltVLineColor = tinycolor.readability(vLinePoint.color, contrastColor) < 1.5 ?
             Color.contrast(contrastColor) : vLinePoint.color;
         var xMode = xa.spikemode;
@@ -1784,9 +1903,14 @@ function createSpikelines(gd, closestPoints, opts) {
                     y2: yEndSpike,
                     'stroke-width': xThickness,
                     stroke: xColor,
-                    'stroke-dasharray': Drawing.dashStyle(xa.spikedash, xThickness)
+                    'stroke-dasharray': Drawing.dashStyle(xa.spikedash, xThickness),
+                    px: xValue,
+                    py: yValue,
+                    x0 : x0Width
                 })
                 .classed('spikeline', true)
+                .classed(plotId, true)
+                .classed(yAxisName, true)
                 .classed('crisp', true);
 
             // Background vertical line (to x-axis)
@@ -1797,9 +1921,14 @@ function createSpikelines(gd, closestPoints, opts) {
                     y1: yBase,
                     y2: yEndSpike,
                     'stroke-width': xThickness + 2,
-                    stroke: contrastColor
+                    stroke: contrastColor,
+                    px: xValue,
+                    py: yValue,
+                    x0 : x0Width
                 })
                 .classed('spikeline', true)
+                .classed(plotId, true)
+                .classed(yAxisName, true)
                 .classed('crisp', true);
         }
 
@@ -1810,9 +1939,13 @@ function createSpikelines(gd, closestPoints, opts) {
                     cx: vLinePointX,
                     cy: yEdge - (xa.side !== 'top' ? xThickness : -xThickness),
                     r: xThickness,
-                    fill: xColor
+                    fill: xColor,
+                    px: xValue,
+                    py: yValue
                 })
-                .classed('spikeline', true);
+                .classed('spikeline', true)
+                .classed(plotId, true)
+                .classed(xAxisName, true);
         }
     }
 }
@@ -1849,4 +1982,147 @@ function plainText(s, len) {
         len: len,
         allowedTags: ['br', 'sub', 'sup', 'b', 'i', 'em']
     });
+}
+
+function removeNonPersistentSpikeLines(gd){
+    if (gd === null || gd === undefined) return;
+    removeSpikeLines(gd, true);
+}
+
+function removeSpikeLines(gd, onlyNonPersistent, plot = null){
+    if (gd === null || gd === undefined) return;
+
+    for (var propertyName in gd._fullLayout._plots){
+        var nameMatch = propertyName.match(/^x(\d)*y(\d)*$/);
+        if (nameMatch === null || nameMatch.length <= 0) continue;
+        else{
+            if (plot !== null && plot !== propertyName) continue;
+            var subPlot = gd._fullLayout._plots[propertyName];
+            var xAxisName = subPlot.xaxis._name;
+            var yAxisName = subPlot.yaxis._name;
+
+            if (!onlyNonPersistent || (onlyNonPersistent && !subPlot._persistentXSpikeLine)) {
+                gd._fullLayout._hoverlayer.selectAll('.spikeline').filter('.'+propertyName).filter('.'+xAxisName).remove();
+                subPlot._persistentXSpikeLine = false;
+            }
+
+            if (!onlyNonPersistent || (onlyNonPersistent && !subPlot._persistentYSpikeLine)) {
+                gd._fullLayout._hoverlayer.selectAll('.spikeline').filter('.'+propertyName).filter('.'+yAxisName).remove();
+                subPlot._persistentYSpikeLine = false;
+            }
+        }
+    }   
+}
+
+function repositionPersistentSpikeLinesOnDrag(gd, xaxes, yaxes, dx, dy){
+    if (gd === null || gd === undefined) return;
+
+    var xSpikes = [];
+    var ySpikes = [];
+    var subPlots = []
+
+    for(var i = 0; i < xaxes.length; i++){
+        subPlots.push.apply(subPlots, xaxes[i]._subplotsWith);
+    }
+    for(var i = 0; i < yaxes.length; i++){
+        subPlots.push.apply(subPlots, yaxes[i]._subplotsWith);
+    }
+
+    subPlots = subPlots.filter(function(item, pos){
+      return subPlots.indexOf(item)== pos; 
+    });
+
+    for(var i = 0; i < subPlots.length; i++){
+        var plotId = subPlots[i];
+        var plot = gd._fullLayout._plots[plotId];
+        var spikes = gd._fullLayout._hoverlayer.selectAll('.spikeline').filter('.'+ plotId);
+        var filteredXSpikes = spikes.filter('.'+plot.xaxis._name);
+        for(var index = 0; index < filteredXSpikes[0].length; index++){
+            xSpikes.push(filteredXSpikes[0][index]);
+        }  
+
+        var filteredYSpikes = spikes.filter('.'+plot.yaxis._name);
+        for(var index = 0; index < filteredYSpikes[0].length; index++){
+            ySpikes.push(filteredYSpikes[0][index]);
+        }         
+    }
+
+    xSpikes = xSpikes.filter(function(item, pos){
+      return xSpikes.indexOf(item)== pos; 
+    });
+
+    ySpikes = ySpikes.filter(function(item, pos){
+      return ySpikes.indexOf(item)== pos; 
+    });
+
+
+    for(var i = 0; i < ySpikes.length; i++){
+        var previousDx = ySpikes[i].dx === undefined ? 0 : ySpikes[i].dx;
+        ySpikes[i].setAttribute('transform', "translate(" + (previousDx + dx) + ",0)");
+    }
+
+    for(var i = 0; i < xSpikes.length; i++){
+        var previousDy = xSpikes[i].dy === undefined ? 0 : xSpikes[i].dy;
+        xSpikes[i].setAttribute('transform', "translate(0," + (previousDy + dy) + ")");
+    }
+}
+
+function cachedSpikeLinesPositions(gd, xaxes, yaxes){
+    if (gd === null || gd === undefined) return;
+
+    var spikes = [];
+    var subPlots = []
+
+    for(var i = 0; i < xaxes.length; i++){
+        subPlots.push.apply(subPlots, xaxes[i]._subplotsWith);
+    }
+    for(var i = 0; i < yaxes.length; i++){
+        subPlots.push.apply(subPlots, yaxes[i]._subplotsWith);
+    }
+
+    subPlots = subPlots.filter(function(item, pos){
+      return subPlots.indexOf(item)== pos; 
+    });
+
+    for(var i = 0; i < subPlots.length; i++){
+        var plotId = subPlots[i];
+        var plot = gd._fullLayout._plots[plotId];
+        // Assuming there is only 1 line per plot.
+        var lineElem = plot.plot[0][0].querySelectorAll('.lines .js-line');
+        var isPointPresentInPlot = false;
+        var traceChildNodes = lineElem[0].parentElement.parentElement.children;
+        for (var i = 0; i < traceChildNodes.length; i++) {
+            if (traceChildNodes[i].className == "points") {
+              isPointPresentInPlot = traceChildNodes[i].children > 0;
+              break;
+            }        
+        }
+        if (isPointPresentInPlot) continue; // only have to manually cache dx and dy if the plot has no points.
+
+        var plotSpikes = gd._fullLayout._hoverlayer.selectAll('.spikeline').filter('.'+ plotId);
+ 
+        for(var index = 0; index < plotSpikes[0].length; index++){
+            spikes.push(plotSpikes[0][index]);
+        }             
+    }
+
+    var previousDx = 0;
+    var previousDy = 0;
+
+    for(var i = 0; i < spikes.length; i ++){
+
+        var transformAttr = spikes[i].attributes['transform'];
+
+        if(transformAttr !== null && transformAttr !== undefined){
+            var regexMatch = transformAttr.value.match(/^translate\((-?\d+(\.\d{1,2})?),(-?\d+(\.\d{1,2})?)\)$/);
+
+            if(regexMatch !== null && regexMatch.length > 0) {
+                previousDy = parseFloat(regexMatch[3]);
+                previousDx = parseFloat(regexMatch[1]);
+            }        
+        }
+
+        spikes[i].dx = previousDx;
+        spikes[i].dy = previousDy;
+    }
 }

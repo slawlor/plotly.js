@@ -10,6 +10,7 @@
 
 var Registry = require('../../registry');
 var hover = require('./hover').hover;
+var toggleSpikeLinesPresistency = require('./hover').toggleSpikeLinesPresistency;
 
 module.exports = function click(gd, evt, subplot) {
     var annotationsDone = Registry.getComponentMethod('annotations', 'onClick')(gd, gd._hoverdata);
@@ -28,6 +29,8 @@ module.exports = function click(gd, evt, subplot) {
         if(annotationsDone && annotationsDone.then) {
             annotationsDone.then(emitClick);
         } else emitClick();
+        
+        toggleSpikeLinesPresistency(gd);
 
         // why do we get a double event without this???
         if(evt.stopImmediatePropagation) evt.stopImmediatePropagation();

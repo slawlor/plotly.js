@@ -69,7 +69,7 @@ drawing.setRect = function(s, x, y, w, h) {
  *  true if selection got translated
  *  false if selection could not get translated
  */
-drawing.translatePoint = function(d, sel, xa, ya) {
+drawing.translatePoint = function(d, sel, xa, ya, gd) {
     var x = xa.c2p(d.x);
     var y = ya.c2p(d.y);
 
@@ -78,6 +78,7 @@ drawing.translatePoint = function(d, sel, xa, ya) {
         if(sel.node().nodeName === 'text') {
             sel.attr('x', x).attr('y', y);
         } else {
+            if (gd !== undefined && gd !== null) updateSpikeLines(gd, sel, d.x, d.y, x, y, xa, ya);
             sel.attr('transform', 'translate(' + x + ',' + y + ')');
         }
     } else {
@@ -87,10 +88,10 @@ drawing.translatePoint = function(d, sel, xa, ya) {
     return true;
 };
 
-drawing.translatePoints = function(s, xa, ya) {
+drawing.translatePoints = function(s, xa, ya, gd = undefined) {
     s.each(function(d) {
         var sel = d3.select(this);
-        drawing.translatePoint(d, sel, xa, ya);
+        drawing.translatePoint(d, sel, xa, ya, gd);
     });
 };
 
@@ -1183,4 +1184,69 @@ drawing.setTextPointsScale = function(selection, xScale, yScale) {
 
         el.attr('transform', transforms.join(' '));
     });
-};
+}
+
+// Update spikeline for a given points (When the graph has points, then we will call this per point)
+function updateSpikeLines(gd, sel, px, py, x, y, xAxis, yAxis){
+    if (gd === null || gd === undefined) return;
+
+    var previousDx = 0;
+    var previousDy = 0;
+
+    var transformAttr = sel.attr('transform');
+
+    if(transformAttr !== null){
+        var regexMatch = transformAttr.match(/^translate\((-?\d+(\.\d{1,2})?),(-?\d+(\.\d{1,2})?)\)$/);
+
+        if(regexMatch !== null && regexMatch.length > 0) {
+            previousDy = parseFloat(regexMatch[3]);
+            previousDx = parseFloat(regexMatch[1]);
+        }        
+    }
+
+    var dx = x - previousDx;
+    var dy = y - previousDy;
+
+    drawing.repositionPersistentSpikeLines(gd, px, py, dx, dy, xAxis, yAxis);
+}
+
+// Reposition spikeline for a given points (When the graph has points, then we will call this per point)
+drawing.repositionPersistentSpikeLines = function(gd, px, py, dx, dy, xAxis, yAxis){
+    if (gd === null || gd === undefined) return;
+
+    var xSpikes = [];
+    var ySpikes = [];
+
+    var plotId = xAxis._id + yAxis._id;
+    if (gd._fullLayout === undefined) return;
+    if (px === null || py === null || px === undefined || py === undefined) return;
+    
+    var spikeLines = gd._fullLayout._hoverlayer.selectAll('.spikeline')
+        .filter('.' + plotId)
+        .filter('[px ="' + px + '"]')
+        .filter('[py ="' + py + '"]');
+
+    var filteredXSpikes = spikeLines.filter('.'+ xAxis._name);
+    for(var index = 0; index < filteredXSpikes[0].length; index++){
+        xSpikes.push(filteredXSpikes[0][index]);
+    }
+
+    var filteredYSpikes = spikeLines.filter('.'+ yAxis._name);
+    for(var index = 0; index < filteredYSpikes[0].length; index++){
+        ySpikes.push(filteredYSpikes[0][index]);
+    }
+
+    for(var i = 0; i < ySpikes.length; i++){
+        var previousDx = ySpikes[i].dx === undefined ? 0 : ySpikes[i].dx;
+        var newDx = previousDx + dx;
+        ySpikes[i].setAttribute('transform', "translate(" + (previousDx + dx) + ",0)");
+        ySpikes[i].dx = newDx;
+    }
+
+    for(var i = 0; i < xSpikes.length; i++){
+        var previousDy = xSpikes[i].dy === undefined ? 0 : xSpikes[i].dy;
+        var newDy = previousDy + dy;
+        xSpikes[i].setAttribute('transform', "translate(0," + (previousDy + dy) + ")");
+        xSpikes[i].dy = newDy;
+    }
+}

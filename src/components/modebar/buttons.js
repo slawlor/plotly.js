@@ -12,6 +12,7 @@ var Registry = require('../../registry');
 var Plots = require('../../plots/plots');
 var axisIds = require('../../plots/cartesian/axis_ids');
 var Icons = require('../../fonts/ploticon');
+var resetSpikeLines = require('../fx/hover').resetSpikeLines;
 var eraseActiveShape = require('../shapes/draw').eraseActiveShape;
 var Lib = require('../../lib');
 var _ = Lib._;
@@ -252,6 +253,7 @@ function handleCartesian(gd, ev) {
     var aobj = {};
     var axList = axisIds.list(gd, null, true);
     var allSpikesEnabled = fullLayout._cartesianSpikesEnabled;
+    if (astr === 'zoom' && val === 'reset') resetSpikeLines(gd);
 
     var ax, i;
 
@@ -645,7 +647,13 @@ modeBarButtons.toggleSpikelines = {
         var fullLayout = gd._fullLayout;
         var allSpikesEnabled = fullLayout._cartesianSpikesEnabled;
 
-        fullLayout._cartesianSpikesEnabled = allSpikesEnabled === 'on' ? 'off' : 'on';
+        if (allSpikesEnabled === 'on') {
+            fullLayout._cartesianSpikesEnabled = 'off';
+            resetSpikeLines(gd);
+        }
+        else {
+            fullLayout._cartesianSpikesEnabled = 'on';
+        }
         Registry.call('_guiRelayout', gd, setSpikelineVisibility(gd));
     }
 };
