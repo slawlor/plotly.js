@@ -58057,6 +58057,13 @@
                     "editType": "plot",
                     "description": "A single toggle to hide the axis while preserving interaction like dragging. Default is true when a cheater plot is present on the axis, otherwise false"
                 },
+                "spikePersistOnClick": {
+                    "valType": "boolean",
+                    "dflt": false,
+                    "role": "style",
+                    "editType": "none",
+                    "description": "Set rather if spike line should persist after clicking on the hover point"
+                },
                 "color": {
                     "valType": "color",
                     "dflt": "#444",
@@ -58490,6 +58497,13 @@
                     "role": "style",
                     "editType": "none",
                     "description": "Determines whether spikelines are stuck to the cursor or to the closest datapoints."
+                },
+                "subPlotsLabeled": {
+                    "valType": "boolean",
+                    "dflt": false,
+                    "role": "style",
+                    "editType": "none",
+                    "description": "Set rather if all subplots should have the axis labels, only works for x axis for now"
                 },
                 "tickfont": {
                     "family": {
@@ -59234,6 +59248,13 @@
                     "editType": "plot",
                     "description": "A single toggle to hide the axis while preserving interaction like dragging. Default is true when a cheater plot is present on the axis, otherwise false"
                 },
+                "spikePersistOnClick": {
+                    "valType": "boolean",
+                    "dflt": false,
+                    "role": "style",
+                    "editType": "none",
+                    "description": "Set rather if spike line should persist after clicking on the hover point"
+                },
                 "color": {
                     "valType": "color",
                     "dflt": "#444",
@@ -59667,6 +59688,13 @@
                     "role": "style",
                     "editType": "none",
                     "description": "Determines whether spikelines are stuck to the cursor or to the closest datapoints."
+                },
+                "subPlotsLabeled": {
+                    "valType": "boolean",
+                    "dflt": false,
+                    "role": "style",
+                    "editType": "none",
+                    "description": "Set rather if all subplots should have the axis labels, only works for x axis for now"
                 },
                 "tickfont": {
                     "family": {

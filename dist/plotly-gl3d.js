@@ -162,7 +162,7 @@ module.exports = _dereq_('../src/traces/mesh3d');
 
 module.exports = _dereq_('../src/traces/scatter3d');
 
-},{"../src/traces/scatter3d":667}],8:[function(_dereq_,module,exports){
+},{"../src/traces/scatter3d":639}],8:[function(_dereq_,module,exports){
 /**
 * Copyright 2012-2020, Plotly, Inc.
 * All rights reserved.
@@ -53594,6 +53594,335 @@ function findZeroCrossings(array, level) {
 * LICENSE file in the root directory of this source tree.
 */
 
+
+'use strict';
+
+var annAttrs = _dereq_('../annotations/attributes');
+var overrideAll = _dereq_('../../plot_api/edit_types').overrideAll;
+var templatedArray = _dereq_('../../plot_api/plot_template').templatedArray;
+
+module.exports = overrideAll(templatedArray('annotation', {
+    visible: annAttrs.visible,
+    x: {
+        valType: 'any',
+        
+        
+    },
+    y: {
+        valType: 'any',
+        
+        
+    },
+    z: {
+        valType: 'any',
+        
+        
+    },
+    ax: {
+        valType: 'number',
+        
+        
+    },
+    ay: {
+        valType: 'number',
+        
+        
+    },
+
+    xanchor: annAttrs.xanchor,
+    xshift: annAttrs.xshift,
+    yanchor: annAttrs.yanchor,
+    yshift: annAttrs.yshift,
+
+    text: annAttrs.text,
+    textangle: annAttrs.textangle,
+    font: annAttrs.font,
+    width: annAttrs.width,
+    height: annAttrs.height,
+    opacity: annAttrs.opacity,
+    align: annAttrs.align,
+    valign: annAttrs.valign,
+    bgcolor: annAttrs.bgcolor,
+    bordercolor: annAttrs.bordercolor,
+    borderpad: annAttrs.borderpad,
+    borderwidth: annAttrs.borderwidth,
+    showarrow: annAttrs.showarrow,
+    arrowcolor: annAttrs.arrowcolor,
+    arrowhead: annAttrs.arrowhead,
+    startarrowhead: annAttrs.startarrowhead,
+    arrowside: annAttrs.arrowside,
+    arrowsize: annAttrs.arrowsize,
+    startarrowsize: annAttrs.startarrowsize,
+    arrowwidth: annAttrs.arrowwidth,
+    standoff: annAttrs.standoff,
+    startstandoff: annAttrs.startstandoff,
+    hovertext: annAttrs.hovertext,
+    hoverlabel: annAttrs.hoverlabel,
+    captureevents: annAttrs.captureevents,
+
+    // maybes later?
+    // clicktoshow: annAttrs.clicktoshow,
+    // xclick: annAttrs.xclick,
+    // yclick: annAttrs.yclick,
+
+    // not needed!
+    // axref: 'pixel'
+    // ayref: 'pixel'
+    // xref: 'x'
+    // yref: 'y
+    // zref: 'z'
+}), 'calc', 'from-root');
+
+},{"../../plot_api/edit_types":535,"../../plot_api/plot_template":542,"../annotations/attributes":368}],363:[function(_dereq_,module,exports){
+/**
+* Copyright 2012-2020, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+'use strict';
+
+var Lib = _dereq_('../../lib');
+var Axes = _dereq_('../../plots/cartesian/axes');
+
+module.exports = function convert(scene) {
+    var fullSceneLayout = scene.fullSceneLayout;
+    var anns = fullSceneLayout.annotations;
+
+    for(var i = 0; i < anns.length; i++) {
+        mockAnnAxes(anns[i], scene);
+    }
+
+    scene.fullLayout._infolayer
+        .selectAll('.annotation-' + scene.id)
+        .remove();
+};
+
+function mockAnnAxes(ann, scene) {
+    var fullSceneLayout = scene.fullSceneLayout;
+    var domain = fullSceneLayout.domain;
+    var size = scene.fullLayout._size;
+
+    var base = {
+        // this gets fill in on render
+        pdata: null,
+
+        // to get setConvert to not execute cleanly
+        type: 'linear',
+
+        // don't try to update them on `editable: true`
+        autorange: false,
+
+        // set infinite range so that annotation draw routine
+        // does not try to remove 'outside-range' annotations,
+        // this case is handled in the render loop
+        range: [-Infinity, Infinity]
+    };
+
+    ann._xa = {};
+    Lib.extendFlat(ann._xa, base);
+    Axes.setConvert(ann._xa);
+    ann._xa._offset = size.l + domain.x[0] * size.w;
+    ann._xa.l2p = function() {
+        return 0.5 * (1 + ann._pdata[0] / ann._pdata[3]) * size.w * (domain.x[1] - domain.x[0]);
+    };
+
+    ann._ya = {};
+    Lib.extendFlat(ann._ya, base);
+    Axes.setConvert(ann._ya);
+    ann._ya._offset = size.t + (1 - domain.y[1]) * size.h;
+    ann._ya.l2p = function() {
+        return 0.5 * (1 - ann._pdata[1] / ann._pdata[3]) * size.h * (domain.y[1] - domain.y[0]);
+    };
+}
+
+},{"../../lib":506,"../../plots/cartesian/axes":552}],364:[function(_dereq_,module,exports){
+/**
+* Copyright 2012-2020, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+'use strict';
+
+var Lib = _dereq_('../../lib');
+var Axes = _dereq_('../../plots/cartesian/axes');
+var handleArrayContainerDefaults = _dereq_('../../plots/array_container_defaults');
+var handleAnnotationCommonDefaults = _dereq_('../annotations/common_defaults');
+var attributes = _dereq_('./attributes');
+
+module.exports = function handleDefaults(sceneLayoutIn, sceneLayoutOut, opts) {
+    handleArrayContainerDefaults(sceneLayoutIn, sceneLayoutOut, {
+        name: 'annotations',
+        handleItemDefaults: handleAnnotationDefaults,
+        fullLayout: opts.fullLayout
+    });
+};
+
+function handleAnnotationDefaults(annIn, annOut, sceneLayout, opts) {
+    function coerce(attr, dflt) {
+        return Lib.coerce(annIn, annOut, attributes, attr, dflt);
+    }
+
+    function coercePosition(axLetter) {
+        var axName = axLetter + 'axis';
+
+        // mock in such way that getFromId grabs correct 3D axis
+        var gdMock = { _fullLayout: {} };
+        gdMock._fullLayout[axName] = sceneLayout[axName];
+
+        return Axes.coercePosition(annOut, gdMock, coerce, axLetter, axLetter, 0.5);
+    }
+
+
+    var visible = coerce('visible');
+    if(!visible) return;
+
+    handleAnnotationCommonDefaults(annIn, annOut, opts.fullLayout, coerce);
+
+    coercePosition('x');
+    coercePosition('y');
+    coercePosition('z');
+
+    // if you have one coordinate you should all three
+    Lib.noneOrAll(annIn, annOut, ['x', 'y', 'z']);
+
+    // hard-set here for completeness
+    annOut.xref = 'x';
+    annOut.yref = 'y';
+    annOut.zref = 'z';
+
+    coerce('xanchor');
+    coerce('yanchor');
+    coerce('xshift');
+    coerce('yshift');
+
+    if(annOut.showarrow) {
+        annOut.axref = 'pixel';
+        annOut.ayref = 'pixel';
+
+        // TODO maybe default values should be bigger than the 2D case?
+        coerce('ax', -10);
+        coerce('ay', -30);
+
+        // if you have one part of arrow length you should have both
+        Lib.noneOrAll(annIn, annOut, ['ax', 'ay']);
+    }
+}
+
+},{"../../lib":506,"../../plots/array_container_defaults":548,"../../plots/cartesian/axes":552,"../annotations/common_defaults":371,"./attributes":362}],365:[function(_dereq_,module,exports){
+/**
+* Copyright 2012-2020, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+'use strict';
+
+var drawRaw = _dereq_('../annotations/draw').drawRaw;
+var project = _dereq_('../../plots/gl3d/project');
+var axLetters = ['x', 'y', 'z'];
+
+module.exports = function draw(scene) {
+    var fullSceneLayout = scene.fullSceneLayout;
+    var dataScale = scene.dataScale;
+    var anns = fullSceneLayout.annotations;
+
+    for(var i = 0; i < anns.length; i++) {
+        var ann = anns[i];
+        var annotationIsOffscreen = false;
+
+        for(var j = 0; j < 3; j++) {
+            var axLetter = axLetters[j];
+            var pos = ann[axLetter];
+            var ax = fullSceneLayout[axLetter + 'axis'];
+            var posFraction = ax.r2fraction(pos);
+
+            if(posFraction < 0 || posFraction > 1) {
+                annotationIsOffscreen = true;
+                break;
+            }
+        }
+
+        if(annotationIsOffscreen) {
+            scene.fullLayout._infolayer
+                .select('.annotation-' + scene.id + '[data-index="' + i + '"]')
+                .remove();
+        } else {
+            ann._pdata = project(scene.glplot.cameraParams, [
+                fullSceneLayout.xaxis.r2l(ann.x) * dataScale[0],
+                fullSceneLayout.yaxis.r2l(ann.y) * dataScale[1],
+                fullSceneLayout.zaxis.r2l(ann.z) * dataScale[2]
+            ]);
+
+            drawRaw(scene.graphDiv, ann, i, scene.id, ann._xa, ann._ya);
+        }
+    }
+};
+
+},{"../../plots/gl3d/project":592,"../annotations/draw":374}],366:[function(_dereq_,module,exports){
+/**
+* Copyright 2012-2020, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+'use strict';
+
+var Registry = _dereq_('../../registry');
+var Lib = _dereq_('../../lib');
+
+module.exports = {
+    moduleType: 'component',
+    name: 'annotations3d',
+
+    schema: {
+        subplots: {
+            scene: {annotations: _dereq_('./attributes')}
+        }
+    },
+
+    layoutAttributes: _dereq_('./attributes'),
+    handleDefaults: _dereq_('./defaults'),
+    includeBasePlot: includeGL3D,
+
+    convert: _dereq_('./convert'),
+    draw: _dereq_('./draw')
+};
+
+function includeGL3D(layoutIn, layoutOut) {
+    var GL3D = Registry.subplotsRegistry.gl3d;
+    if(!GL3D) return;
+
+    var attrRegex = GL3D.attrRegex;
+
+    var keys = Object.keys(layoutIn);
+    for(var i = 0; i < keys.length; i++) {
+        var k = keys[i];
+        if(attrRegex.test(k) && (layoutIn[k].annotations || []).length) {
+            Lib.pushUnique(layoutOut._basePlotModules, GL3D);
+            Lib.pushUnique(layoutOut._subplots.gl3d, k);
+        }
+    }
+}
+
+},{"../../lib":506,"../../registry":606,"./attributes":362,"./convert":363,"./defaults":364,"./draw":365}],367:[function(_dereq_,module,exports){
+/**
+* Copyright 2012-2020, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
 'use strict';
 
 /**
@@ -53656,7 +53985,7 @@ module.exports = [
     }
 ];
 
-},{}],363:[function(_dereq_,module,exports){
+},{}],368:[function(_dereq_,module,exports){
 /**
 * Copyright 2012-2020, Plotly, Inc.
 * All rights reserved.
@@ -54011,7 +54340,7 @@ module.exports = templatedArray('annotation', {
     }
 });
 
-},{"../../plot_api/plot_template":542,"../../plots/cartesian/constants":558,"../../plots/font_attributes":580,"./arrow_paths":362}],364:[function(_dereq_,module,exports){
+},{"../../plot_api/plot_template":542,"../../plots/cartesian/constants":558,"../../plots/font_attributes":580,"./arrow_paths":367}],369:[function(_dereq_,module,exports){
 /**
 * Copyright 2012-2020, Plotly, Inc.
 * All rights reserved.
@@ -54100,7 +54429,7 @@ function calcAxisExpansion(ann, ax) {
     ann._extremes[axId] = extremes;
 }
 
-},{"../../lib":506,"../../plots/cartesian/axes":552,"./draw":369}],365:[function(_dereq_,module,exports){
+},{"../../lib":506,"../../plots/cartesian/axes":552,"./draw":374}],370:[function(_dereq_,module,exports){
 /**
 * Copyright 2012-2020, Plotly, Inc.
 * All rights reserved.
@@ -54238,7 +54567,7 @@ function clickData2r(d, ax) {
     return ax.type === 'log' ? ax.l2r(d) : ax.d2r(d);
 }
 
-},{"../../lib":506,"../../plot_api/plot_template":542,"../../registry":606}],366:[function(_dereq_,module,exports){
+},{"../../lib":506,"../../plot_api/plot_template":542,"../../registry":606}],371:[function(_dereq_,module,exports){
 /**
 * Copyright 2012-2020, Plotly, Inc.
 * All rights reserved.
@@ -54317,7 +54646,7 @@ module.exports = function handleAnnotationCommonDefaults(annIn, annOut, fullLayo
     coerce('captureevents', !!hoverText);
 };
 
-},{"../../lib":506,"../color":378}],367:[function(_dereq_,module,exports){
+},{"../../lib":506,"../color":378}],372:[function(_dereq_,module,exports){
 /**
 * Copyright 2012-2020, Plotly, Inc.
 * All rights reserved.
@@ -54380,7 +54709,7 @@ module.exports = function convertCoords(gd, ax, newType, doExtra) {
     }
 };
 
-},{"../../lib/to_log_range":531,"fast-isnumeric":90}],368:[function(_dereq_,module,exports){
+},{"../../lib/to_log_range":531,"fast-isnumeric":90}],373:[function(_dereq_,module,exports){
 /**
 * Copyright 2012-2020, Plotly, Inc.
 * All rights reserved.
@@ -54487,7 +54816,7 @@ function handleAnnotationDefaults(annIn, annOut, fullLayout) {
     }
 }
 
-},{"../../lib":506,"../../plots/array_container_defaults":548,"../../plots/cartesian/axes":552,"./attributes":363,"./common_defaults":366}],369:[function(_dereq_,module,exports){
+},{"../../lib":506,"../../plots/array_container_defaults":548,"../../plots/cartesian/axes":552,"./attributes":368,"./common_defaults":371}],374:[function(_dereq_,module,exports){
 /**
 * Copyright 2012-2020, Plotly, Inc.
 * All rights reserved.
@@ -55187,7 +55516,7 @@ function drawRaw(gd, options, index, subplotId, xa, ya) {
     } else annText.call(textLayout);
 }
 
-},{"../../lib":506,"../../lib/setcursor":525,"../../lib/svg_text_utils":529,"../../plot_api/plot_template":542,"../../plots/cartesian/axes":552,"../../plots/plots":597,"../../registry":606,"../color":378,"../dragelement":397,"../drawing":400,"../fx":418,"./draw_arrow_head":370,"d3":81}],370:[function(_dereq_,module,exports){
+},{"../../lib":506,"../../lib/setcursor":525,"../../lib/svg_text_utils":529,"../../plot_api/plot_template":542,"../../plots/cartesian/axes":552,"../../plots/plots":597,"../../registry":606,"../color":378,"../dragelement":397,"../drawing":400,"../fx":418,"./draw_arrow_head":375,"d3":81}],375:[function(_dereq_,module,exports){
 /**
 * Copyright 2012-2020, Plotly, Inc.
 * All rights reserved.
@@ -55338,7 +55667,7 @@ module.exports = function drawArrowHead(el3, ends, options) {
     if(doEnd) drawhead(headStyle, end, endRot, scale);
 };
 
-},{"../color":378,"./arrow_paths":362,"d3":81}],371:[function(_dereq_,module,exports){
+},{"../color":378,"./arrow_paths":367,"d3":81}],376:[function(_dereq_,module,exports){
 /**
 * Copyright 2012-2020, Plotly, Inc.
 * All rights reserved.
@@ -55372,336 +55701,7 @@ module.exports = {
     convertCoords: _dereq_('./convert_coords')
 };
 
-},{"../../plots/cartesian/include_components":564,"./attributes":363,"./calc_autorange":364,"./click":365,"./convert_coords":367,"./defaults":368,"./draw":369}],372:[function(_dereq_,module,exports){
-/**
-* Copyright 2012-2020, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-
-'use strict';
-
-var annAttrs = _dereq_('../annotations/attributes');
-var overrideAll = _dereq_('../../plot_api/edit_types').overrideAll;
-var templatedArray = _dereq_('../../plot_api/plot_template').templatedArray;
-
-module.exports = overrideAll(templatedArray('annotation', {
-    visible: annAttrs.visible,
-    x: {
-        valType: 'any',
-        
-        
-    },
-    y: {
-        valType: 'any',
-        
-        
-    },
-    z: {
-        valType: 'any',
-        
-        
-    },
-    ax: {
-        valType: 'number',
-        
-        
-    },
-    ay: {
-        valType: 'number',
-        
-        
-    },
-
-    xanchor: annAttrs.xanchor,
-    xshift: annAttrs.xshift,
-    yanchor: annAttrs.yanchor,
-    yshift: annAttrs.yshift,
-
-    text: annAttrs.text,
-    textangle: annAttrs.textangle,
-    font: annAttrs.font,
-    width: annAttrs.width,
-    height: annAttrs.height,
-    opacity: annAttrs.opacity,
-    align: annAttrs.align,
-    valign: annAttrs.valign,
-    bgcolor: annAttrs.bgcolor,
-    bordercolor: annAttrs.bordercolor,
-    borderpad: annAttrs.borderpad,
-    borderwidth: annAttrs.borderwidth,
-    showarrow: annAttrs.showarrow,
-    arrowcolor: annAttrs.arrowcolor,
-    arrowhead: annAttrs.arrowhead,
-    startarrowhead: annAttrs.startarrowhead,
-    arrowside: annAttrs.arrowside,
-    arrowsize: annAttrs.arrowsize,
-    startarrowsize: annAttrs.startarrowsize,
-    arrowwidth: annAttrs.arrowwidth,
-    standoff: annAttrs.standoff,
-    startstandoff: annAttrs.startstandoff,
-    hovertext: annAttrs.hovertext,
-    hoverlabel: annAttrs.hoverlabel,
-    captureevents: annAttrs.captureevents,
-
-    // maybes later?
-    // clicktoshow: annAttrs.clicktoshow,
-    // xclick: annAttrs.xclick,
-    // yclick: annAttrs.yclick,
-
-    // not needed!
-    // axref: 'pixel'
-    // ayref: 'pixel'
-    // xref: 'x'
-    // yref: 'y
-    // zref: 'z'
-}), 'calc', 'from-root');
-
-},{"../../plot_api/edit_types":535,"../../plot_api/plot_template":542,"../annotations/attributes":363}],373:[function(_dereq_,module,exports){
-/**
-* Copyright 2012-2020, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-'use strict';
-
-var Lib = _dereq_('../../lib');
-var Axes = _dereq_('../../plots/cartesian/axes');
-
-module.exports = function convert(scene) {
-    var fullSceneLayout = scene.fullSceneLayout;
-    var anns = fullSceneLayout.annotations;
-
-    for(var i = 0; i < anns.length; i++) {
-        mockAnnAxes(anns[i], scene);
-    }
-
-    scene.fullLayout._infolayer
-        .selectAll('.annotation-' + scene.id)
-        .remove();
-};
-
-function mockAnnAxes(ann, scene) {
-    var fullSceneLayout = scene.fullSceneLayout;
-    var domain = fullSceneLayout.domain;
-    var size = scene.fullLayout._size;
-
-    var base = {
-        // this gets fill in on render
-        pdata: null,
-
-        // to get setConvert to not execute cleanly
-        type: 'linear',
-
-        // don't try to update them on `editable: true`
-        autorange: false,
-
-        // set infinite range so that annotation draw routine
-        // does not try to remove 'outside-range' annotations,
-        // this case is handled in the render loop
-        range: [-Infinity, Infinity]
-    };
-
-    ann._xa = {};
-    Lib.extendFlat(ann._xa, base);
-    Axes.setConvert(ann._xa);
-    ann._xa._offset = size.l + domain.x[0] * size.w;
-    ann._xa.l2p = function() {
-        return 0.5 * (1 + ann._pdata[0] / ann._pdata[3]) * size.w * (domain.x[1] - domain.x[0]);
-    };
-
-    ann._ya = {};
-    Lib.extendFlat(ann._ya, base);
-    Axes.setConvert(ann._ya);
-    ann._ya._offset = size.t + (1 - domain.y[1]) * size.h;
-    ann._ya.l2p = function() {
-        return 0.5 * (1 - ann._pdata[1] / ann._pdata[3]) * size.h * (domain.y[1] - domain.y[0]);
-    };
-}
-
-},{"../../lib":506,"../../plots/cartesian/axes":552}],374:[function(_dereq_,module,exports){
-/**
-* Copyright 2012-2020, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-'use strict';
-
-var Lib = _dereq_('../../lib');
-var Axes = _dereq_('../../plots/cartesian/axes');
-var handleArrayContainerDefaults = _dereq_('../../plots/array_container_defaults');
-var handleAnnotationCommonDefaults = _dereq_('../annotations/common_defaults');
-var attributes = _dereq_('./attributes');
-
-module.exports = function handleDefaults(sceneLayoutIn, sceneLayoutOut, opts) {
-    handleArrayContainerDefaults(sceneLayoutIn, sceneLayoutOut, {
-        name: 'annotations',
-        handleItemDefaults: handleAnnotationDefaults,
-        fullLayout: opts.fullLayout
-    });
-};
-
-function handleAnnotationDefaults(annIn, annOut, sceneLayout, opts) {
-    function coerce(attr, dflt) {
-        return Lib.coerce(annIn, annOut, attributes, attr, dflt);
-    }
-
-    function coercePosition(axLetter) {
-        var axName = axLetter + 'axis';
-
-        // mock in such way that getFromId grabs correct 3D axis
-        var gdMock = { _fullLayout: {} };
-        gdMock._fullLayout[axName] = sceneLayout[axName];
-
-        return Axes.coercePosition(annOut, gdMock, coerce, axLetter, axLetter, 0.5);
-    }
-
-
-    var visible = coerce('visible');
-    if(!visible) return;
-
-    handleAnnotationCommonDefaults(annIn, annOut, opts.fullLayout, coerce);
-
-    coercePosition('x');
-    coercePosition('y');
-    coercePosition('z');
-
-    // if you have one coordinate you should all three
-    Lib.noneOrAll(annIn, annOut, ['x', 'y', 'z']);
-
-    // hard-set here for completeness
-    annOut.xref = 'x';
-    annOut.yref = 'y';
-    annOut.zref = 'z';
-
-    coerce('xanchor');
-    coerce('yanchor');
-    coerce('xshift');
-    coerce('yshift');
-
-    if(annOut.showarrow) {
-        annOut.axref = 'pixel';
-        annOut.ayref = 'pixel';
-
-        // TODO maybe default values should be bigger than the 2D case?
-        coerce('ax', -10);
-        coerce('ay', -30);
-
-        // if you have one part of arrow length you should have both
-        Lib.noneOrAll(annIn, annOut, ['ax', 'ay']);
-    }
-}
-
-},{"../../lib":506,"../../plots/array_container_defaults":548,"../../plots/cartesian/axes":552,"../annotations/common_defaults":366,"./attributes":372}],375:[function(_dereq_,module,exports){
-/**
-* Copyright 2012-2020, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-'use strict';
-
-var drawRaw = _dereq_('../annotations/draw').drawRaw;
-var project = _dereq_('../../plots/gl3d/project');
-var axLetters = ['x', 'y', 'z'];
-
-module.exports = function draw(scene) {
-    var fullSceneLayout = scene.fullSceneLayout;
-    var dataScale = scene.dataScale;
-    var anns = fullSceneLayout.annotations;
-
-    for(var i = 0; i < anns.length; i++) {
-        var ann = anns[i];
-        var annotationIsOffscreen = false;
-
-        for(var j = 0; j < 3; j++) {
-            var axLetter = axLetters[j];
-            var pos = ann[axLetter];
-            var ax = fullSceneLayout[axLetter + 'axis'];
-            var posFraction = ax.r2fraction(pos);
-
-            if(posFraction < 0 || posFraction > 1) {
-                annotationIsOffscreen = true;
-                break;
-            }
-        }
-
-        if(annotationIsOffscreen) {
-            scene.fullLayout._infolayer
-                .select('.annotation-' + scene.id + '[data-index="' + i + '"]')
-                .remove();
-        } else {
-            ann._pdata = project(scene.glplot.cameraParams, [
-                fullSceneLayout.xaxis.r2l(ann.x) * dataScale[0],
-                fullSceneLayout.yaxis.r2l(ann.y) * dataScale[1],
-                fullSceneLayout.zaxis.r2l(ann.z) * dataScale[2]
-            ]);
-
-            drawRaw(scene.graphDiv, ann, i, scene.id, ann._xa, ann._ya);
-        }
-    }
-};
-
-},{"../../plots/gl3d/project":592,"../annotations/draw":369}],376:[function(_dereq_,module,exports){
-/**
-* Copyright 2012-2020, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-'use strict';
-
-var Registry = _dereq_('../../registry');
-var Lib = _dereq_('../../lib');
-
-module.exports = {
-    moduleType: 'component',
-    name: 'annotations3d',
-
-    schema: {
-        subplots: {
-            scene: {annotations: _dereq_('./attributes')}
-        }
-    },
-
-    layoutAttributes: _dereq_('./attributes'),
-    handleDefaults: _dereq_('./defaults'),
-    includeBasePlot: includeGL3D,
-
-    convert: _dereq_('./convert'),
-    draw: _dereq_('./draw')
-};
-
-function includeGL3D(layoutIn, layoutOut) {
-    var GL3D = Registry.subplotsRegistry.gl3d;
-    if(!GL3D) return;
-
-    var attrRegex = GL3D.attrRegex;
-
-    var keys = Object.keys(layoutIn);
-    for(var i = 0; i < keys.length; i++) {
-        var k = keys[i];
-        if(attrRegex.test(k) && (layoutIn[k].annotations || []).length) {
-            Lib.pushUnique(layoutOut._basePlotModules, GL3D);
-            Lib.pushUnique(layoutOut._subplots.gl3d, k);
-        }
-    }
-}
-
-},{"../../lib":506,"../../registry":606,"./attributes":372,"./convert":373,"./defaults":374,"./draw":375}],377:[function(_dereq_,module,exports){
+},{"../../plots/cartesian/include_components":564,"./attributes":368,"./calc_autorange":369,"./click":370,"./convert_coords":372,"./defaults":373,"./draw":374}],377:[function(_dereq_,module,exports){
 /**
 * Copyright 2012-2020, Plotly, Inc.
 * All rights reserved.
@@ -58481,6 +58481,8 @@ var getGraphDiv = _dereq_('../../lib/dom').getGraphDiv;
 
 var hoverConstants = _dereq_('../fx/constants');
 
+var removeNonPersistentSpikeLines = _dereq_('../fx/hover').removeNonPersistentSpikeLines
+
 var unhover = module.exports = {};
 
 unhover.wrapped = function(gd, evt, subplot) {
@@ -58507,7 +58509,8 @@ unhover.raw = function raw(gd, evt) {
     }
 
     fullLayout._hoverlayer.selectAll('g').remove();
-    fullLayout._hoverlayer.selectAll('line').remove();
+    removeNonPersistentSpikeLines(gd);
+    //fullLayout._hoverlayer.selectAll('line').remove();
     fullLayout._hoverlayer.selectAll('circle').remove();
     gd._hoverdata = undefined;
 
@@ -58519,7 +58522,7 @@ unhover.raw = function raw(gd, evt) {
     }
 };
 
-},{"../../lib/dom":498,"../../lib/events":499,"../../lib/throttle":530,"../fx/constants":412}],399:[function(_dereq_,module,exports){
+},{"../../lib/dom":498,"../../lib/events":499,"../../lib/throttle":530,"../fx/constants":412,"../fx/hover":415}],399:[function(_dereq_,module,exports){
 /**
 * Copyright 2012-2020, Plotly, Inc.
 * All rights reserved.
@@ -58616,7 +58619,7 @@ drawing.setRect = function(s, x, y, w, h) {
  *  true if selection got translated
  *  false if selection could not get translated
  */
-drawing.translatePoint = function(d, sel, xa, ya) {
+drawing.translatePoint = function(d, sel, xa, ya, gd) {
     var x = xa.c2p(d.x);
     var y = ya.c2p(d.y);
 
@@ -58625,6 +58628,7 @@ drawing.translatePoint = function(d, sel, xa, ya) {
         if(sel.node().nodeName === 'text') {
             sel.attr('x', x).attr('y', y);
         } else {
+            if (gd !== undefined && gd !== null) updateSpikeLines(gd, sel, d.x, d.y, d.i, x, y, xa, ya);
             sel.attr('transform', 'translate(' + x + ',' + y + ')');
         }
     } else {
@@ -58634,10 +58638,10 @@ drawing.translatePoint = function(d, sel, xa, ya) {
     return true;
 };
 
-drawing.translatePoints = function(s, xa, ya) {
+drawing.translatePoints = function(s, xa, ya, gd = undefined) {
     s.each(function(d) {
         var sel = d3.select(this);
-        drawing.translatePoint(d, sel, xa, ya);
+        drawing.translatePoint(d, sel, xa, ya, gd);
     });
 };
 
@@ -59730,9 +59734,74 @@ drawing.setTextPointsScale = function(selection, xScale, yScale) {
 
         el.attr('transform', transforms.join(' '));
     });
-};
+}
 
-},{"../../components/fx/helpers":414,"../../constants/alignment":480,"../../constants/interactions":484,"../../constants/xmlns_namespaces":486,"../../lib":506,"../../lib/svg_text_utils":529,"../../registry":606,"../../traces/scatter/make_bubble_size_func":652,"../../traces/scatter/subtypes":659,"../color":378,"../colorscale":390,"./symbol_defs":401,"d3":81,"fast-isnumeric":90,"tinycolor2":344}],401:[function(_dereq_,module,exports){
+// Update spikeline for a given points (When the graph has points, then we will call this per point)
+function updateSpikeLines(gd, sel, px, py, pNumber, x, y, xAxis, yAxis){
+    if (gd === null || gd === undefined) return;
+
+    var previousDx = 0;
+    var previousDy = 0;
+
+    var transformAttr = sel.attr('transform');
+
+    if(transformAttr !== null){
+        var regexMatch = transformAttr.match(/^translate\((-?\d+(\.\d{1,2})?),(-?\d+(\.\d{1,2})?)\)$/);
+
+        if(regexMatch !== null && regexMatch.length > 0) {
+            previousDy = parseFloat(regexMatch[3]);
+            previousDx = parseFloat(regexMatch[1]);
+        }        
+    }
+
+    var dx = x - previousDx;
+    var dy = y - previousDy;
+
+    drawing.repositionPersistentSpikeLines(gd, px, py, pNumber, dx, dy, xAxis, yAxis);
+}
+
+// Reposition spikeline for a given points (When the graph has points, then we will call this per point)
+drawing.repositionPersistentSpikeLines = function(gd, px, py, pNumber, dx, dy, xAxis, yAxis){
+    if (gd === null || gd === undefined) return;
+
+    var xSpikes = [];
+    var ySpikes = [];
+
+    var plotId = xAxis._id + yAxis._id;
+    if (gd._fullLayout === undefined) return;
+    if (px === null || py === null || px === undefined || py === undefined) return;
+    
+    var spikeLines = gd._fullLayout._hoverlayer.selectAll('.spikeline')
+        .filter('.' + plotId)
+        .filter('[px ="' + px + '"]')
+        .filter('[py ="' + py + '"]')
+        .filter('[pNumber ="' + pNumber + '"]');
+
+    var filteredXSpikes = spikeLines.filter('.'+ xAxis._name);
+    for(var index = 0; index < filteredXSpikes[0].length; index++){
+        xSpikes.push(filteredXSpikes[0][index]);
+    }
+
+    var filteredYSpikes = spikeLines.filter('.'+ yAxis._name);
+    for(var index = 0; index < filteredYSpikes[0].length; index++){
+        ySpikes.push(filteredYSpikes[0][index]);
+    }
+
+    for(var i = 0; i < ySpikes.length; i++){
+        var previousDx = ySpikes[i].dx === undefined ? 0 : ySpikes[i].dx;
+        var newDx = previousDx + dx;
+        ySpikes[i].setAttribute('transform', "translate(" + (previousDx + dx) + ",0)");
+        ySpikes[i].dx = newDx;
+    }
+
+    for(var i = 0; i < xSpikes.length; i++){
+        var previousDy = xSpikes[i].dy === undefined ? 0 : xSpikes[i].dy;
+        var newDy = previousDy + dy;
+        xSpikes[i].setAttribute('transform', "translate(0," + (previousDy + dy) + ")");
+        xSpikes[i].dy = newDy;
+    }
+}
+},{"../../components/fx/helpers":414,"../../constants/alignment":480,"../../constants/interactions":484,"../../constants/xmlns_namespaces":486,"../../lib":506,"../../lib/svg_text_utils":529,"../../registry":606,"../../traces/scatter/make_bubble_size_func":658,"../../traces/scatter/subtypes":665,"../color":378,"../colorscale":390,"./symbol_defs":401,"d3":81,"fast-isnumeric":90,"tinycolor2":344}],401:[function(_dereq_,module,exports){
 /**
 * Copyright 2012-2020, Plotly, Inc.
 * All rights reserved.
@@ -60838,7 +60907,7 @@ function errorCoords(d, xa, ya) {
     return out;
 }
 
-},{"../../traces/scatter/subtypes":659,"../drawing":400,"d3":81,"fast-isnumeric":90}],408:[function(_dereq_,module,exports){
+},{"../../traces/scatter/subtypes":665,"../drawing":400,"d3":81,"fast-isnumeric":90}],408:[function(_dereq_,module,exports){
 /**
 * Copyright 2012-2020, Plotly, Inc.
 * All rights reserved.
@@ -60983,6 +61052,7 @@ function paste(traceAttr, cd, cdAttr, fn) {
 
 var Registry = _dereq_('../../registry');
 var hover = _dereq_('./hover').hover;
+var toggleSpikeLinesPresistency = _dereq_('./hover').toggleSpikeLinesPresistency;
 
 module.exports = function click(gd, evt, subplot) {
     var annotationsDone = Registry.getComponentMethod('annotations', 'onClick')(gd, gd._hoverdata);
@@ -61001,6 +61071,8 @@ module.exports = function click(gd, evt, subplot) {
         if(annotationsDone && annotationsDone.then) {
             annotationsDone.then(emitClick);
         } else emitClick();
+        
+        toggleSpikeLinesPresistency(gd);
 
         // why do we get a double event without this???
         if(evt.stopImmediatePropagation) evt.stopImmediatePropagation();
@@ -61408,6 +61480,77 @@ exports.hover = function hover(gd, evt, subplot, noHoverEvent) {
         function() { _hover(gd, evt, subplot, noHoverEvent); }
     );
 };
+
+exports.removeNonPersistentSpikeLines = removeNonPersistentSpikeLines;
+exports.repositionPersistentSpikeLinesOnDrag = repositionPersistentSpikeLinesOnDrag;
+exports.cachedSpikeLinesPositions = cachedSpikeLinesPositions;
+
+exports.toggleSpikeLinesPresistency = function toggleSpikeLinesPresistency(gd){   
+    if (gd === null || gd === undefined) return;
+    
+    var hoverData = gd._hoverdata[0];
+    if(hoverData === null || hoverData === undefined) return;
+
+    var xAxisName = hoverData.xaxis._name;
+    var yAxisName = hoverData.yaxis._name;
+    var xAxis = gd._fullLayout[xAxisName];
+    var yAxis = gd._fullLayout[yAxisName];
+
+    var subPlotName = xAxis._id + yAxis._id;
+    var subPlot = gd._fullLayout._plots[subPlotName];
+    if (subPlot === undefined) return;
+
+    if (subPlot._persistentXSpikeLine === undefined) subPlot._persistentXSpikeLine = false;
+    if (subPlot._persistentYSpikeLine === undefined) subPlot._persistentYSpikeLine = false;
+    
+    if (xAxis.spikePersistOnClick || yAxis.spikePersistOnClick){
+
+        if (subPlot._persistentXSpikeLine || subPlot._persistentYSpikeLine){
+            subPlot._persistentXSpikeLine = false;
+            subPlot._persistentYSpikeLine = false;
+        }
+        else{
+            var gs = gd._fullLayout._size;
+            if(xAxis.spikePersistOnClick){
+                var x1 = gs.l;
+                var x2 = gs.l + gs.w;
+                
+                var spikeLines = gd._fullLayout._hoverlayer.selectAll('line').filter('.spikeline').filter('.'+subPlotName).filter('.'+xAxisName);
+                if (spikeLines === undefined || spikeLines === null || spikeLines.length <= 0) return;
+                for(var i = 0; i < spikeLines[0].length; i++){
+                    var line = spikeLines[0][i]
+                    line.attributes.x1.value = x1;
+                    line.attributes.x2.value = x2;
+                }
+
+                subPlot._persistentXSpikeLine = true;
+            } 
+            if(yAxis.spikePersistOnClick){
+                var y1 = gs.t;
+                var y2 = gs.t + gs.h;
+                
+                var spikeLines = gd._fullLayout._hoverlayer.selectAll('line').filter('.spikeline').filter('.'+subPlotName).filter('.'+yAxisName);
+                if (spikeLines === undefined || spikeLines === null || spikeLines.length <= 0) return;
+                for(var i = 0; i < spikeLines[0].length; i++){
+                    var line = spikeLines[0][i]
+                    line.attributes.y1.value = y1;
+                    line.attributes.y2.value = y2;
+                }
+
+                subPlot._persistentYSpikeLine = true;
+            } 
+        }
+    }        
+}
+
+exports.removePlotSpikeLines = function removePlotSpikeLines(gd, plotId){
+    removeSpikeLines(gd, false, plotId);
+}
+exports.resetSpikeLines = function resetSpikeLines(gd){
+    // maybe need to loop all axis and cancel, if not delete this
+    removeSpikeLines(gd, false);
+}
+
 
 /*
  * Draw a single hover item or an array of hover item in a pre-existing svg container somewhere
@@ -61905,7 +62048,9 @@ function _hover(gd, evt, subplot, noHoverEvent) {
             spikeDistance: point.spikeDistance,
             curveNumber: point.trace.index,
             color: point.color,
-            pointNumber: point.index
+            pointNumber: point.index,
+            xVal : point.xLabelVal,
+            yVal : point.yLabelVal,
         };
     }
 
@@ -62970,6 +63115,8 @@ function cleanPoint(d, hovermode) {
 }
 
 function createSpikelines(gd, closestPoints, opts) {
+    var vLinePoint = closestPoints.vLinePoint;
+    var hLinePoint = closestPoints.hLinePoint;
     var container = opts.container;
     var fullLayout = opts.fullLayout;
     var gs = fullLayout._size;
@@ -62979,16 +63126,38 @@ function createSpikelines(gd, closestPoints, opts) {
 
     var xa, ya;
 
+    if(vLinePoint !== null && vLinePoint !== undefined){
+        var xAxisName = vLinePoint.xa._name;
+        var yAxisName = vLinePoint.ya._name;
+        var xAxis = gd._fullLayout[xAxisName];
+        var yAxis = gd._fullLayout[yAxisName];
+
+        var subPlotName = xAxis._id + yAxis._id;
+        var subPlot = gd._fullLayout._plots[subPlotName];
+        if (subPlot === undefined) return;
+
+        if (subPlot._persistentXSpikeLine && xAxis.spikePersistOnClick || subPlot._persistentYSpikeLine && yAxis.spikePersistOnClick) return;
+    }
+
     // Remove old spikeline items
-    container.selectAll('.spikeline').remove();
+    removeNonPersistentSpikeLines(gd);
 
     if(!(showX || showY)) return;
 
+    var vLine = closestPoints.vLinePoint;
+    var xAxisName = vLine.xa._name;
+    var yAxisName = vLine.ya._name;
+
+    var plotId = vLine.xa._id + vLine.ya._id;
+
     var contrastColor = Color.combine(fullLayout.plot_bgcolor, fullLayout.paper_bgcolor);
+
+    var xValue = hLinePoint.xVal;
+    var yValue = vLinePoint.yVal;
+    var pointNumber = vLinePoint.pointNumber;
 
     // Horizontal line (to y-axis)
     if(showY) {
-        var hLinePoint = closestPoints.hLinePoint;
         var hLinePointX, hLinePointY;
 
         xa = hLinePoint && hLinePoint.xa;
@@ -63002,6 +63171,7 @@ function createSpikelines(gd, closestPoints, opts) {
             hLinePointX = xa._offset + hLinePoint.x;
             hLinePointY = ya._offset + hLinePoint.y;
         }
+
         var dfltHLineColor = tinycolor.readability(hLinePoint.color, contrastColor) < 1.5 ?
             Color.contrast(contrastColor) : hLinePoint.color;
         var yMode = ya.spikemode;
@@ -63035,9 +63205,14 @@ function createSpikelines(gd, closestPoints, opts) {
                     y2: hLinePointY,
                     'stroke-width': yThickness,
                     stroke: yColor,
-                    'stroke-dasharray': Drawing.dashStyle(ya.spikedash, yThickness)
+                    'stroke-dasharray': Drawing.dashStyle(ya.spikedash, yThickness),
+                    px: xValue,
+                    py: yValue,
+                    pNumber: pointNumber
                 })
                 .classed('spikeline', true)
+                .classed(plotId, true)
+                .classed(xAxisName, true)
                 .classed('crisp', true);
 
             // Background horizontal Line (to y-axis)
@@ -63048,9 +63223,14 @@ function createSpikelines(gd, closestPoints, opts) {
                     y1: hLinePointY,
                     y2: hLinePointY,
                     'stroke-width': yThickness + 2,
-                    stroke: contrastColor
+                    stroke: contrastColor,
+                    px: xValue,
+                    py: yValue,
+                    pNumber: pointNumber
                 })
                 .classed('spikeline', true)
+                .classed(plotId, true)
+                .classed(xAxisName, true)
                 .classed('crisp', true);
         }
         // Y axis marker
@@ -63060,14 +63240,18 @@ function createSpikelines(gd, closestPoints, opts) {
                     cx: xEdge + (ya.side !== 'right' ? yThickness : -yThickness),
                     cy: hLinePointY,
                     r: yThickness,
-                    fill: yColor
+                    fill: yColor,
+                    px: xValue,
+                    py: yValue,
+                    pNumber: pointNumber
                 })
-                .classed('spikeline', true);
+                .classed('spikeline', true)
+                .classed(plotId, true)
+                .classed(yAxisName, true);
         }
     }
 
     if(showX) {
-        var vLinePoint = closestPoints.vLinePoint;
         var vLinePointX, vLinePointY;
 
         xa = vLinePoint && vLinePoint.xa;
@@ -63081,6 +63265,7 @@ function createSpikelines(gd, closestPoints, opts) {
             vLinePointX = xa._offset + vLinePoint.x;
             vLinePointY = ya._offset + vLinePoint.y;
         }
+
         var dfltVLineColor = tinycolor.readability(vLinePoint.color, contrastColor) < 1.5 ?
             Color.contrast(contrastColor) : vLinePoint.color;
         var xMode = xa.spikemode;
@@ -63114,9 +63299,14 @@ function createSpikelines(gd, closestPoints, opts) {
                     y2: yEndSpike,
                     'stroke-width': xThickness,
                     stroke: xColor,
-                    'stroke-dasharray': Drawing.dashStyle(xa.spikedash, xThickness)
+                    'stroke-dasharray': Drawing.dashStyle(xa.spikedash, xThickness),
+                    px: xValue,
+                    py: yValue,
+                    pNumber: pointNumber
                 })
                 .classed('spikeline', true)
+                .classed(plotId, true)
+                .classed(yAxisName, true)
                 .classed('crisp', true);
 
             // Background vertical line (to x-axis)
@@ -63127,9 +63317,14 @@ function createSpikelines(gd, closestPoints, opts) {
                     y1: yBase,
                     y2: yEndSpike,
                     'stroke-width': xThickness + 2,
-                    stroke: contrastColor
+                    stroke: contrastColor,
+                    px: xValue,
+                    py: yValue,
+                    pNumber: pointNumber
                 })
                 .classed('spikeline', true)
+                .classed(plotId, true)
+                .classed(yAxisName, true)
                 .classed('crisp', true);
         }
 
@@ -63140,9 +63335,14 @@ function createSpikelines(gd, closestPoints, opts) {
                     cx: vLinePointX,
                     cy: yEdge - (xa.side !== 'top' ? xThickness : -xThickness),
                     r: xThickness,
-                    fill: xColor
+                    fill: xColor,
+                    px: xValue,
+                    py: yValue,
+                    pNumber: pointNumber
                 })
-                .classed('spikeline', true);
+                .classed('spikeline', true)
+                .classed(plotId, true)
+                .classed(xAxisName, true);
         }
     }
 }
@@ -63179,6 +63379,162 @@ function plainText(s, len) {
         len: len,
         allowedTags: ['br', 'sub', 'sup', 'b', 'i', 'em']
     });
+}
+
+function removeNonPersistentSpikeLines(gd){
+    if (gd === null || gd === undefined) return;
+    removeSpikeLines(gd, true);
+}
+
+function removeSpikeLines(gd, onlyNonPersistent, plot = null){
+    if (gd === null || gd === undefined) return;
+
+    for (var propertyName in gd._fullLayout._plots){
+        var nameMatch = propertyName.match(/^x(\d)*y(\d)*$/);
+        if (nameMatch === null || nameMatch.length <= 0) continue;
+        else{
+            if (plot !== null && plot !== propertyName) continue;
+            var subPlot = gd._fullLayout._plots[propertyName];
+            var xAxisName = subPlot.xaxis._name;
+            var yAxisName = subPlot.yaxis._name;
+
+            if (!onlyNonPersistent || (onlyNonPersistent && !subPlot._persistentXSpikeLine)) {
+                gd._fullLayout._hoverlayer.selectAll('.spikeline').filter('.'+propertyName).filter('.'+xAxisName).remove();
+                subPlot._persistentXSpikeLine = false;
+            }
+
+            if (!onlyNonPersistent || (onlyNonPersistent && !subPlot._persistentYSpikeLine)) {
+                gd._fullLayout._hoverlayer.selectAll('.spikeline').filter('.'+propertyName).filter('.'+yAxisName).remove();
+                subPlot._persistentYSpikeLine = false;
+            }
+        }
+    }   
+}
+
+function repositionPersistentSpikeLinesOnDrag(gd, xaxes, yaxes, dx, dy){
+    if (gd === null || gd === undefined) return;
+
+    var xSpikes = [];
+    var ySpikes = [];
+    var xSubPlots = []
+    var ySubPlots = []
+
+    for(var i = 0; i < xaxes.length; i++){
+        xSubPlots.push.apply(xSubPlots, xaxes[i]._subplotsWith);
+    }
+    for(var i = 0; i < yaxes.length; i++){
+        ySubPlots.push.apply(ySubPlots, yaxes[i]._subplotsWith);
+    }
+
+    xSubPlots = xSubPlots.filter(function(item, pos){
+      return xSubPlots.indexOf(item)== pos; 
+    });
+
+    ySubPlots = ySubPlots.filter(function(item, pos){
+      return ySubPlots.indexOf(item)== pos; 
+    });
+
+    for(var i = 0; i < xSubPlots.length; i++){
+        var plotId = xSubPlots[i];
+        var plot = gd._fullLayout._plots[plotId];
+        var spikes = gd._fullLayout._hoverlayer.selectAll('.spikeline').filter('.'+ plotId);
+
+        var filteredYSpikes = spikes.filter('.'+plot.yaxis._name);
+        for(var index = 0; index < filteredYSpikes[0].length; index++){
+            ySpikes.push(filteredYSpikes[0][index]);
+        }         
+    }
+
+    for(var i = 0; i < ySubPlots.length; i++){
+        var plotId = ySubPlots[i];
+        var plot = gd._fullLayout._plots[plotId];
+        var spikes = gd._fullLayout._hoverlayer.selectAll('.spikeline').filter('.'+ plotId);
+
+        var filteredXSpikes = spikes.filter('.'+plot.xaxis._name);
+        for(var index = 0; index < filteredXSpikes[0].length; index++){
+            xSpikes.push(filteredXSpikes[0][index]);
+        }        
+    }
+    
+    xSpikes = xSpikes.filter(function(item, pos){
+      return xSpikes.indexOf(item)== pos; 
+    });
+
+    ySpikes = ySpikes.filter(function(item, pos){
+      return ySpikes.indexOf(item)== pos; 
+    });
+
+
+    for(var i = 0; i < ySpikes.length; i++){
+        var previousDx = ySpikes[i].dx === undefined ? 0 : ySpikes[i].dx;
+        ySpikes[i].setAttribute('transform', "translate(" + (previousDx + dx) + ",0)");
+    }
+
+    for(var i = 0; i < xSpikes.length; i++){
+        var previousDy = xSpikes[i].dy === undefined ? 0 : xSpikes[i].dy;
+        xSpikes[i].setAttribute('transform', "translate(0," + (previousDy + dy) + ")");
+    }
+}
+
+function cachedSpikeLinesPositions(gd, xaxes, yaxes){
+    if (gd === null || gd === undefined) return;
+
+    var spikes = [];
+    var subPlots = []
+
+    for(var i = 0; i < xaxes.length; i++){
+        subPlots.push.apply(subPlots, xaxes[i]._subplotsWith);
+    }
+    for(var i = 0; i < yaxes.length; i++){
+        subPlots.push.apply(subPlots, yaxes[i]._subplotsWith);
+    }
+
+    subPlots = subPlots.filter(function(item, pos){
+      return subPlots.indexOf(item)== pos; 
+    });
+
+    for(var i = 0; i < subPlots.length; i++){
+        var plotId = subPlots[i];
+        var plot = gd._fullLayout._plots[plotId];
+        // Assuming there is only 1 line per plot.
+        var lineElem = plot.plot[0][0].querySelectorAll('.lines .js-line');
+        if (lineElem.length === 0 || lineElem[0] === undefined || lineElem[0] === null) continue;
+        var isPointPresentInPlot = false;
+        var traceChildNodes = lineElem[0].parentElement.parentElement.children;
+        for (var i = 0; i < traceChildNodes.length; i++) {
+            if (traceChildNodes[i].className == "points") {
+              isPointPresentInPlot = traceChildNodes[i].children > 0;
+              break;
+            }        
+        }
+        if (isPointPresentInPlot) continue; // only have to manually cache dx and dy if the plot has no points.
+
+        var plotSpikes = gd._fullLayout._hoverlayer.selectAll('.spikeline').filter('.'+ plotId);
+ 
+        for(var index = 0; index < plotSpikes[0].length; index++){
+            spikes.push(plotSpikes[0][index]);
+        }             
+    }
+
+    var previousDx = 0;
+    var previousDy = 0;
+
+    for(var i = 0; i < spikes.length; i ++){
+
+        var transformAttr = spikes[i].attributes['transform'];
+
+        if(transformAttr !== null && transformAttr !== undefined){
+            var regexMatch = transformAttr.value.match(/^translate\((-?\d+(\.\d{1,2})?),(-?\d+(\.\d{1,2})?)\)$/);
+
+            if(regexMatch !== null && regexMatch.length > 0) {
+                previousDy = parseFloat(regexMatch[3]);
+                previousDx = parseFloat(regexMatch[1]);
+            }        
+        }
+
+        spikes[i].dx = previousDx;
+        spikes[i].dy = previousDy;
+    }
 }
 
 },{"../../lib":506,"../../lib/events":499,"../../lib/override_cursor":517,"../../lib/svg_text_utils":529,"../../plots/cartesian/axes":552,"../../registry":606,"../color":378,"../dragelement":397,"../drawing":400,"../legend/defaults":430,"../legend/draw":431,"./constants":412,"./helpers":414,"d3":81,"fast-isnumeric":90,"tinycolor2":344}],416:[function(_dereq_,module,exports){
@@ -64871,6 +65227,8 @@ module.exports = function draw(gd, opts) {
             .text(title.text);
 
         textLayout(titleEl, scrollBox, gd, opts); // handle mathjax or multi-line text and compute title height
+    } else {
+        scrollBox.selectAll('.legendtitletext').remove();
     }
 
     var scrollBar = Lib.ensureSingle(legend, 'rect', 'scrollbar', function(s) {
@@ -65688,6 +66046,7 @@ module.exports = function getLegendData(calcdata, opts) {
 
 var Lib = _dereq_('../../lib');
 var Registry = _dereq_('../../registry');
+var removePlotSpikeLines = _dereq_('../fx/hover').removePlotSpikeLines;
 
 var SHOWISOLATETIP = true;
 
@@ -65747,6 +66106,10 @@ module.exports = function handleClick(g, gd, numClicks) {
 
     function setVisibility(fullTrace, visibility) {
         var fullInput = fullTrace._fullInput;
+        var plotId = fullTrace.xaxis + fullTrace.yaxis;
+        if (visibility == false || visibility === 'legendonly'){
+            removePlotSpikeLines(gd, plotId);
+        }
         if(Registry.hasTransform(fullInput, 'groupby')) {
             var kcont = carrs[fullInput.index];
             if(!kcont) {
@@ -65914,7 +66277,7 @@ module.exports = function handleClick(g, gd, numClicks) {
     }
 };
 
-},{"../../lib":506,"../../registry":606}],434:[function(_dereq_,module,exports){
+},{"../../lib":506,"../../registry":606,"../fx/hover":415}],434:[function(_dereq_,module,exports){
 /**
 * Copyright 2012-2020, Plotly, Inc.
 * All rights reserved.
@@ -66589,7 +66952,7 @@ function getGradientDirection(reversescale, isRadial) {
     return str + (reversescale ? '' : 'reversed');
 }
 
-},{"../../lib":506,"../../registry":606,"../../traces/pie/helpers":632,"../../traces/pie/style_one":633,"../../traces/scatter/subtypes":659,"../color":378,"../colorscale/helpers":389,"../drawing":400,"d3":81}],437:[function(_dereq_,module,exports){
+},{"../../lib":506,"../../registry":606,"../../traces/pie/helpers":632,"../../traces/pie/style_one":633,"../../traces/scatter/subtypes":665,"../color":378,"../colorscale/helpers":389,"../drawing":400,"d3":81}],437:[function(_dereq_,module,exports){
 /**
 * Copyright 2012-2020, Plotly, Inc.
 * All rights reserved.
@@ -66604,6 +66967,7 @@ var Registry = _dereq_('../../registry');
 var Plots = _dereq_('../../plots/plots');
 var axisIds = _dereq_('../../plots/cartesian/axis_ids');
 var Icons = _dereq_('../../fonts/ploticon');
+var resetSpikeLines = _dereq_('../fx/hover').resetSpikeLines;
 var eraseActiveShape = _dereq_('../shapes/draw').eraseActiveShape;
 var Lib = _dereq_('../../lib');
 var _ = Lib._;
@@ -66844,6 +67208,7 @@ function handleCartesian(gd, ev) {
     var aobj = {};
     var axList = axisIds.list(gd, null, true);
     var allSpikesEnabled = fullLayout._cartesianSpikesEnabled;
+    if (astr === 'zoom' && val === 'reset') resetSpikeLines(gd);
 
     var ax, i;
 
@@ -67237,7 +67602,13 @@ modeBarButtons.toggleSpikelines = {
         var fullLayout = gd._fullLayout;
         var allSpikesEnabled = fullLayout._cartesianSpikesEnabled;
 
-        fullLayout._cartesianSpikesEnabled = allSpikesEnabled === 'on' ? 'off' : 'on';
+        if (allSpikesEnabled === 'on') {
+            fullLayout._cartesianSpikesEnabled = 'off';
+            resetSpikeLines(gd);
+        }
+        else {
+            fullLayout._cartesianSpikesEnabled = 'on';
+        }
         Registry.call('_guiRelayout', gd, setSpikelineVisibility(gd));
     }
 };
@@ -67322,7 +67693,7 @@ function resetView(gd, subplotType) {
     Registry.call('_guiRelayout', gd, aObj);
 }
 
-},{"../../fonts/ploticon":489,"../../lib":506,"../../plots/cartesian/axis_ids":555,"../../plots/plots":597,"../../registry":606,"../shapes/draw":459}],438:[function(_dereq_,module,exports){
+},{"../../fonts/ploticon":489,"../../lib":506,"../../plots/cartesian/axis_ids":555,"../../plots/plots":597,"../../registry":606,"../fx/hover":415,"../shapes/draw":459}],438:[function(_dereq_,module,exports){
 /**
 * Copyright 2012-2020, Plotly, Inc.
 * All rights reserved.
@@ -67632,7 +68003,7 @@ function fillCustomButton(customButtons) {
     return customButtons;
 }
 
-},{"../../plots/cartesian/axis_ids":555,"../../registry":606,"../../traces/scatter/subtypes":659,"../fx/helpers":414,"./buttons":437,"./modebar":440}],440:[function(_dereq_,module,exports){
+},{"../../plots/cartesian/axis_ids":555,"../../registry":606,"../../traces/scatter/subtypes":665,"../fx/helpers":414,"./buttons":437,"./modebar":440}],440:[function(_dereq_,module,exports){
 /**
 * Copyright 2012-2020, Plotly, Inc.
 * All rights reserved.
@@ -69762,7 +70133,7 @@ module.exports = templatedArray('shape', {
     editType: 'arraydraw'
 });
 
-},{"../../lib/extend":500,"../../plot_api/plot_template":542,"../../traces/scatter/attributes":635,"../annotations/attributes":363,"../drawing/attributes":399}],456:[function(_dereq_,module,exports){
+},{"../../lib/extend":500,"../../plot_api/plot_template":542,"../../traces/scatter/attributes":641,"../annotations/attributes":368,"../drawing/attributes":399}],456:[function(_dereq_,module,exports){
 /**
 * Copyright 2012-2020, Plotly, Inc.
 * All rights reserved.
@@ -75205,7 +75576,7 @@ exports.Queue = _dereq_('./lib/queue');
 // export d3 used in the bundle
 exports.d3 = _dereq_('d3');
 
-},{"../build/plotcss":1,"./components/annotations":371,"./components/annotations3d":376,"./components/colorbar":384,"./components/colorscale":390,"./components/errorbars":406,"./components/fx":418,"./components/grid":422,"./components/images":427,"./components/legend":435,"./components/rangeselector":446,"./components/rangeslider":453,"./components/shapes":467,"./components/sliders":472,"./components/updatemenus":478,"./fonts/mathjax_config":488,"./fonts/ploticon":489,"./lib/queue":520,"./locale-en":533,"./locale-en-us":532,"./plot_api":537,"./plot_api/plot_schema":541,"./plots/plots":597,"./registry":606,"./snapshot":611,"./traces/scatter":647,"./version":682,"d3":81,"es6-promise":88}],488:[function(_dereq_,module,exports){
+},{"../build/plotcss":1,"./components/annotations":376,"./components/annotations3d":366,"./components/colorbar":384,"./components/colorscale":390,"./components/errorbars":406,"./components/fx":418,"./components/grid":422,"./components/images":427,"./components/legend":435,"./components/rangeselector":446,"./components/rangeslider":453,"./components/shapes":467,"./components/sliders":472,"./components/updatemenus":478,"./fonts/mathjax_config":488,"./fonts/ploticon":489,"./lib/queue":520,"./locale-en":533,"./locale-en-us":532,"./plot_api":537,"./plot_api/plot_schema":541,"./plots/plots":597,"./registry":606,"./snapshot":611,"./traces/scatter":653,"./version":682,"d3":81,"es6-promise":88}],488:[function(_dereq_,module,exports){
 /**
 * Copyright 2012-2020, Plotly, Inc.
 * All rights reserved.
@@ -80683,9 +81054,9 @@ module.exports = function relinkPrivateKeys(toContainer, fromContainer) {
         var fromVal = fromContainer[k];
         var toVal = toContainer[k];
 
-        if(toVal === fromVal) {
-            continue;
-        }
+        if(toVal === fromVal) continue;
+        if(toContainer.matches && k === '_categoriesMap') continue;
+
         if(k.charAt(0) === '_' || typeof fromVal === 'function') {
             // if it already exists at this point, it's something
             // that we recreate each time around, so ignore it
@@ -80729,6 +81100,7 @@ module.exports = function relinkPrivateKeys(toContainer, fromContainer) {
 var isNumeric = _dereq_('fast-isnumeric');
 var loggers = _dereq_('./loggers');
 var identity = _dereq_('./identity');
+var BADNUM = _dereq_('../constants/numerical').BADNUM;
 
 // don't trust floating point equality - fraction of bin size to call
 // "on the line" and ensure that they go the right way specified by
@@ -80789,22 +81161,35 @@ exports.sorterDes = function(a, b) { return b - a; };
  */
 exports.distinctVals = function(valsIn) {
     var vals = valsIn.slice();  // otherwise we sort the original array...
-    vals.sort(exports.sorterAsc);
+    vals.sort(exports.sorterAsc); // undefined listed in the end - also works on IE11
 
-    var l = vals.length - 1;
-    var minDiff = (vals[l] - vals[0]) || 1;
-    var errDiff = minDiff / (l || 1) / 10000;
-    var v2 = [vals[0]];
+    var last;
+    for(last = vals.length - 1; last > -1; last--) {
+        if(vals[last] !== BADNUM) break;
+    }
 
-    for(var i = 0; i < l; i++) {
+    var minDiff = (vals[last] - vals[0]) || 1;
+    var errDiff = minDiff / (last || 1) / 10000;
+    var newVals = [];
+    var preV;
+    for(var i = 0; i <= last; i++) {
+        var v = vals[i];
+
         // make sure values aren't just off by a rounding error
-        if(vals[i + 1] > vals[i] + errDiff) {
-            minDiff = Math.min(minDiff, vals[i + 1] - vals[i]);
-            v2.push(vals[i + 1]);
+        var diff = v - preV;
+
+        if(preV === undefined) {
+            newVals.push(v);
+            preV = v;
+        } else if(diff > errDiff) {
+            minDiff = Math.min(minDiff, diff);
+
+            newVals.push(v);
+            preV = v;
         }
     }
 
-    return {vals: v2, minDiff: minDiff};
+    return {vals: newVals, minDiff: minDiff};
 };
 
 /**
@@ -80901,7 +81286,7 @@ exports.findIndexOfMin = function(arr, fn) {
     return ind;
 };
 
-},{"./identity":505,"./loggers":510,"fast-isnumeric":90}],525:[function(_dereq_,module,exports){
+},{"../constants/numerical":485,"./identity":505,"./loggers":510,"fast-isnumeric":90}],525:[function(_dereq_,module,exports){
 /**
 * Copyright 2012-2020, Plotly, Inc.
 * All rights reserved.
@@ -83480,7 +83865,13 @@ function plot(gd, data, layout, config) {
     fullLayout._replotting = true;
 
     // make or remake the framework if we need to
-    if(graphWasEmpty) makePlotFramework(gd);
+    if(graphWasEmpty || fullLayout._shouldCreateBgLayer) {
+        makePlotFramework(gd);
+
+        if(fullLayout._shouldCreateBgLayer) {
+            delete fullLayout._shouldCreateBgLayer;
+        }
+    }
 
     // polar need a different framework
     if(gd.framework !== makePlotFramework) {
@@ -93161,17 +93552,58 @@ axes.drawOne = function(gd, ax, opts) {
 
     var seq = [];
 
-    // tick labels - for now just the main labels.
-    // TODO: mirror labels, esp for subplots
+    if (axLetter === 'x'){
+        if (ax.subPlotsLabeled){
+            // Label all the sub plots.
+            var subPlots = ax._subplotsWith; 
 
-    seq.push(function() {
-        return axes.drawLabels(gd, ax, {
-            vals: vals,
-            layer: mainAxLayer,
-            transFn: transFn,
-            labelFns: axes.makeLabelFns(ax, mainLinePosition)
-        });
-    });
+            for (var i = 0; i < subPlots.length; i++) {
+                var subPlotId = subPlots[i];
+                var yMatch = subPlotId.match(/y(\d)*$/);
+                if (yMatch === null || yMatch.length <= 0) continue;
+                var subAx = axes.getFromId(gd, yMatch[0], 'y');
+                var subTransFn = axes.makeTransFn2(gd, ax, subAx);
+                var subPlotInfo = fullLayout._plots[subPlotId];
+                var subAxLayer = subPlotInfo[axLetter + 'axislayer'];
+                var opts = {
+                    vals: vals,
+                    layer: subAxLayer,
+                    transFn: subTransFn,
+                    labelFns: axes.makeLabelFns(ax, mainLinePosition)
+                };
+                
+                seq.push(buildLabelingFunc(gd, ax, opts));
+            }
+        }
+        else{
+            //Label only the main plot (sub plot at the bottom)
+            var opts = {
+                    vals: vals,
+                    layer: mainAxLayer,
+                    transFn: transFn,
+                    labelFns: axes.makeLabelFns(ax, mainLinePosition)
+            };
+            seq.push(buildLabelingFunc(gd, ax, opts));
+        }        
+    }
+    else{
+        seq.push(function() {
+            return axes.drawLabels(gd, ax, {
+                vals: vals,
+                layer: mainAxLayer,
+                transFn: transFn,
+                labelFns: axes.makeLabelFns(ax, mainLinePosition)
+                });
+         });
+    }
+    // seq.push(function() {
+    //     return axes.drawLabels(gd, ax, {
+    //         vals: vals,
+    //         layer: mainAxLayer,
+    //         transFn: transFn,
+    //         labelFns: axes.makeLabelFns(ax, mainLinePosition)
+    //     });
+    // });
 
     if(ax.type === 'multicategory') {
         var pad = {x: 2, y: 10}[axLetter];
@@ -93473,6 +93905,20 @@ axes.makeTransFn = function(ax) {
     var offset = ax._offset;
     return axLetter === 'x' ?
         function(d) { return 'translate(' + (offset + ax.l2p(d.x)) + ',0)'; } :
+        function(d) { return 'translate(0,' + (offset + ax.l2p(d.x)) + ')'; };
+};
+
+/**
+* Make axis translate transform function
+*/
+axes.makeTransFn2 = function(gd, ax, subAx) {
+    var axLetter = ax._id.charAt(0);
+    var offset = ax._offset;
+    return axLetter === 'x' ?
+        function(d) { 
+            var offSet = getLabelOffsetHeight(gd, ax._id, subAx._id, ax._mainLinePosition, d.fontSize, subAx._length);
+            return 'translate(' + (offset + ax.l2p(d.x)) + ',' + offSet + ')'; 
+        } :
         function(d) { return 'translate(0,' + (offset + ax.l2p(d.x)) + ')'; };
 };
 
@@ -94437,6 +94883,16 @@ function isAngular(ax) {
     return ax._id === 'angularaxis';
 }
 
+function getLabelOffsetHeight(gd, xAxisId, yAxisId, mainLinePosition, fontSize, plotHeight) {
+    var plotId = xAxisId + yAxisId;
+    var plotPositionY = gd._fullLayout._plots[plotId].plot[0][0].transform.animVal[0].matrix.f;
+    return (plotHeight + plotPositionY) - mainLinePosition - fontSize / 2;
+}
+
+function buildLabelingFunc(gd, ax, opts) {
+    return function() { axes.drawLabels(gd, ax, opts); };
+}
+
 },{"../../components/color":378,"../../components/drawing":400,"../../components/titles":473,"../../constants/alignment":480,"../../constants/numerical":485,"../../lib":506,"../../lib/svg_text_utils":529,"../../plots/plots":597,"../../registry":606,"./autorange":551,"./axis_autotype":553,"./axis_ids":555,"./clean_ticks":557,"./layout_attributes":566,"./set_convert":572,"d3":81,"fast-isnumeric":90}],553:[function(_dereq_,module,exports){
 /**
 * Copyright 2012-2020, Plotly, Inc.
@@ -94847,7 +95303,7 @@ exports.name2id = function name2id(name) {
 };
 
 exports.cleanId = function cleanId(id, axLetter) {
-    if(!id.match(constants.AX_ID_PATTERN)) return;
+    if(typeof id !== 'string' || !id.match(constants.AX_ID_PATTERN)) return;
     if(axLetter && id.charAt(0) !== axLetter) return;
 
     var axNum = id.substr(1).replace(/^0+/, '');
@@ -95640,6 +96096,9 @@ var clearSelect = _dereq_('./select').clearSelect;
 var selectOnClick = _dereq_('./select').selectOnClick;
 var scaleZoom = _dereq_('./scale_zoom');
 
+var repositionPersistentSpikeLinesOnDrag = _dereq_('../../components/fx/hover').repositionPersistentSpikeLinesOnDrag;
+var cachedSpikeLinesPositions = _dereq_('../../components/fx/hover').cachedSpikeLinesPositions;
+
 var constants = _dereq_('./constants');
 var MINDRAG = constants.MINDRAG;
 var MINZOOM = constants.MINZOOM;
@@ -96164,7 +96623,10 @@ function makeDragBox(gd, plotinfo, x, y, w, h, ns, ew) {
                 dragAxList(yaxes, dy);
                 updateMatchedAxRange('y');
             }
-            updateSubplots([xActive ? -dx : 0, yActive ? -dy : 0, pw, ph]);
+            var viewBox = [xActive ? -dx : 0, yActive ? -dy : 0, pw, ph];
+            updateSpikeLines(gd, viewBox, xaxes, yaxes);
+            updateSubplots(viewBox);
+            //updateSubplots([xActive ? -dx : 0, yActive ? -dy : 0, pw, ph]);
             ticksAndAnnotations();
             gd.emit('plotly_relayouting', updates);
             return;
@@ -96385,7 +96847,7 @@ function makeDragBox(gd, plotinfo, x, y, w, h, ns, ew) {
         // be repositioning the data in the relayout. But DON'T call
         // ticksAndAnnotations again - it's unnecessary and would overwrite `updates`
         updateSubplots([0, 0, pw, ph]);
-
+        cacheSpikeLines(gd, xaxes, yaxes);
         // since we may have been redrawing some things during the drag, we may have
         // accumulated MathJax promises - wait for them before we relayout.
         Lib.syncOrAsync([
@@ -96833,6 +97295,10 @@ function attachWheelEventHandler(element, handler) {
     if(!supportsPassive) {
         if(element.onwheel !== undefined) element.onwheel = handler;
         else if(element.onmousewheel !== undefined) element.onmousewheel = handler;
+        else if(!element.isAddedWheelEvent) {
+            element.isAddedWheelEvent = true;
+            element.addEventListener('wheel', handler, {passive: false});
+        }
     } else {
         var wheelEventName = element.onwheel !== undefined ? 'wheel' : 'mousewheel';
 
@@ -96849,6 +97315,14 @@ function hashValues(hash) {
     var out = [];
     for(var k in hash) out.push(hash[k]);
     return out;
+}
+
+function updateSpikeLines(gd, viewBox, xaxes, yaxes){    
+    repositionPersistentSpikeLinesOnDrag(gd, xaxes, yaxes, -viewBox[0], -viewBox[1]);    
+}
+
+function cacheSpikeLines(gd, xaxes, yaxes){
+    cachedSpikeLinesPositions(gd, xaxes, yaxes);
 }
 
 module.exports = {
@@ -96868,7 +97342,7 @@ module.exports = {
     attachWheelEventHandler: attachWheelEventHandler
 };
 
-},{"../../components/color":378,"../../components/dragelement":397,"../../components/dragelement/helpers":396,"../../components/drawing":400,"../../components/fx":418,"../../constants/alignment":480,"../../lib":506,"../../lib/clear_gl_canvases":494,"../../lib/setcursor":525,"../../lib/svg_text_utils":529,"../../plot_api/subroutines":543,"../../registry":606,"../plots":597,"./axes":552,"./axis_ids":555,"./constants":558,"./scale_zoom":570,"./select":571,"d3":81,"has-passive-events":249,"tinycolor2":344}],561:[function(_dereq_,module,exports){
+},{"../../components/color":378,"../../components/dragelement":397,"../../components/dragelement/helpers":396,"../../components/drawing":400,"../../components/fx":418,"../../components/fx/hover":415,"../../constants/alignment":480,"../../lib":506,"../../lib/clear_gl_canvases":494,"../../lib/setcursor":525,"../../lib/svg_text_utils":529,"../../plot_api/subroutines":543,"../../registry":606,"../plots":597,"./axes":552,"./axis_ids":555,"./constants":558,"./scale_zoom":570,"./select":571,"d3":81,"has-passive-events":249,"tinycolor2":344}],561:[function(_dereq_,module,exports){
 /**
 * Copyright 2012-2020, Plotly, Inc.
 * All rights reserved.
@@ -97849,6 +98323,13 @@ module.exports = {
         editType: 'plot',
         
     },
+    spikePersistOnClick: {
+        valType: 'boolean',
+        dflt: false,
+        
+        editType: 'none',
+        
+    },
     color: {
         valType: 'color',
         dflt: colorAttrs.defaultLine,
@@ -98187,6 +98668,13 @@ module.exports = {
         valType: 'enumerated',
         values: ['data', 'cursor', 'hovered data'],
         dflt: 'data',
+        
+        editType: 'none',
+        
+    },
+    subPlotsLabeled:{
+        valType: 'boolean',
+        dflt: false,
         
         editType: 'none',
         
@@ -98755,6 +99243,9 @@ module.exports = function supplyLayoutDefaults(layoutIn, layoutOut, fullData) {
 
         handleTypeDefaults(axLayoutIn, axLayoutOut, coerce, defaultOptions);
         handleAxisDefaults(axLayoutIn, axLayoutOut, coerce, defaultOptions, layoutOut);
+
+        axLayoutOut.subPlotsLabeled = axLayoutIn.subPlotsLabeled;
+        axLayoutOut.spikePersistOnClick = axLayoutIn.spikePersistOnClick;
 
         var unifiedSpike = unifiedHover && axLetter === hovermode.charAt(0);
         var spikecolor = coerce2('spikecolor', unifiedHover ? axLayoutOut.color : undefined);
@@ -101221,6 +101712,7 @@ module.exports = function handleTickDefaults(containerIn, containerOut, coerce, 
 'use strict';
 
 var cleanTicks = _dereq_('./clean_ticks');
+var isArrayOrTypedArray = _dereq_('../../lib').isArrayOrTypedArray;
 
 module.exports = function handleTickValueDefaults(containerIn, containerOut, coerce, axType) {
     function readInput(attr) {
@@ -101233,18 +101725,11 @@ module.exports = function handleTickValueDefaults(containerIn, containerOut, coe
     var _tick0 = readInput('tick0');
     var _dtick = readInput('dtick');
     var _tickvals = readInput('tickvals');
-    var _tickmode = readInput('tickmode');
-    var tickmode;
 
-    if(_tickmode === 'array' &&
-            (axType === 'log' || axType === 'date')) {
-        tickmode = containerOut.tickmode = 'auto';
-    } else {
-        var tickmodeDefault = Array.isArray(_tickvals) ? 'array' :
-            _dtick ? 'linear' :
-            'auto';
-        tickmode = coerce('tickmode', tickmodeDefault);
-    }
+    var tickmodeDefault = isArrayOrTypedArray(_tickvals) ? 'array' :
+        _dtick ? 'linear' :
+        'auto';
+    var tickmode = coerce('tickmode', tickmodeDefault);
 
     if(tickmode === 'auto') coerce('nticks');
     else if(tickmode === 'linear') {
@@ -101262,7 +101747,7 @@ module.exports = function handleTickValueDefaults(containerIn, containerOut, coe
     }
 };
 
-},{"./clean_ticks":557}],576:[function(_dereq_,module,exports){
+},{"../../lib":506,"./clean_ticks":557}],576:[function(_dereq_,module,exports){
 /**
 * Copyright 2012-2020, Plotly, Inc.
 * All rights reserved.
@@ -105433,6 +105918,20 @@ plots.supplyDefaults = function(gd, opts) {
     // clean subplots and other artifacts from previous plot calls
     plots.cleanPlot(newFullData, newFullLayout, oldFullData, oldFullLayout);
 
+    var hadGL2D = !!(oldFullLayout._has && oldFullLayout._has('gl2d'));
+    var hasGL2D = !!(newFullLayout._has && newFullLayout._has('gl2d'));
+    var hadCartesian = !!(oldFullLayout._has && oldFullLayout._has('cartesian'));
+    var hasCartesian = !!(newFullLayout._has && newFullLayout._has('cartesian'));
+    var hadBgLayer = hadCartesian || hadGL2D;
+    var hasBgLayer = hasCartesian || hasGL2D;
+    if(hadBgLayer && !hasBgLayer) {
+        // remove bgLayer
+        oldFullLayout._bgLayer.remove();
+    } else if(hasBgLayer && !hadBgLayer) {
+        // create bgLayer
+        newFullLayout._shouldCreateBgLayer = true;
+    }
+
     // clear selection outline until we implement persistent selection,
     // don't clear them though when drag handlers (e.g. listening to
     // `plotly_selecting`) update the graph.
@@ -108304,7 +108803,7 @@ module.exports = {
     }
 };
 
-},{"../../../lib/extend":500,"../../../traces/scatter/attributes":635}],599:[function(_dereq_,module,exports){
+},{"../../../lib/extend":500,"../../../traces/scatter/attributes":641}],599:[function(_dereq_,module,exports){
 /**
 * Copyright 2012-2020, Plotly, Inc.
 * All rights reserved.
@@ -114227,3157 +114726,6 @@ module.exports = function styleOne(s, pt, trace) {
 * LICENSE file in the root directory of this source tree.
 */
 
-
-'use strict';
-
-var Lib = _dereq_('../../lib');
-
-
-// arrayOk attributes, merge them into calcdata array
-module.exports = function arraysToCalcdata(cd, trace) {
-    // so each point knows which index it originally came from
-    for(var i = 0; i < cd.length; i++) cd[i].i = i;
-
-    Lib.mergeArray(trace.text, cd, 'tx');
-    Lib.mergeArray(trace.texttemplate, cd, 'txt');
-    Lib.mergeArray(trace.hovertext, cd, 'htx');
-    Lib.mergeArray(trace.customdata, cd, 'data');
-    Lib.mergeArray(trace.textposition, cd, 'tp');
-    if(trace.textfont) {
-        Lib.mergeArrayCastPositive(trace.textfont.size, cd, 'ts');
-        Lib.mergeArray(trace.textfont.color, cd, 'tc');
-        Lib.mergeArray(trace.textfont.family, cd, 'tf');
-    }
-
-    var marker = trace.marker;
-    if(marker) {
-        Lib.mergeArrayCastPositive(marker.size, cd, 'ms');
-        Lib.mergeArrayCastPositive(marker.opacity, cd, 'mo');
-        Lib.mergeArray(marker.symbol, cd, 'mx');
-        Lib.mergeArray(marker.color, cd, 'mc');
-
-        var markerLine = marker.line;
-        if(marker.line) {
-            Lib.mergeArray(markerLine.color, cd, 'mlc');
-            Lib.mergeArrayCastPositive(markerLine.width, cd, 'mlw');
-        }
-
-        var markerGradient = marker.gradient;
-        if(markerGradient && markerGradient.type !== 'none') {
-            Lib.mergeArray(markerGradient.type, cd, 'mgt');
-            Lib.mergeArray(markerGradient.color, cd, 'mgc');
-        }
-    }
-};
-
-},{"../../lib":506}],635:[function(_dereq_,module,exports){
-/**
-* Copyright 2012-2020, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-'use strict';
-
-var texttemplateAttrs = _dereq_('../../plots/template_attributes').texttemplateAttrs;
-var hovertemplateAttrs = _dereq_('../../plots/template_attributes').hovertemplateAttrs;
-var colorScaleAttrs = _dereq_('../../components/colorscale/attributes');
-var fontAttrs = _dereq_('../../plots/font_attributes');
-var dash = _dereq_('../../components/drawing/attributes').dash;
-
-var Drawing = _dereq_('../../components/drawing');
-var constants = _dereq_('./constants');
-var extendFlat = _dereq_('../../lib/extend').extendFlat;
-
-module.exports = {
-    x: {
-        valType: 'data_array',
-        editType: 'calc+clearAxisTypes',
-        anim: true,
-        
-    },
-    x0: {
-        valType: 'any',
-        dflt: 0,
-        
-        editType: 'calc+clearAxisTypes',
-        anim: true,
-        
-    },
-    dx: {
-        valType: 'number',
-        dflt: 1,
-        
-        editType: 'calc',
-        anim: true,
-        
-    },
-    y: {
-        valType: 'data_array',
-        editType: 'calc+clearAxisTypes',
-        anim: true,
-        
-    },
-    y0: {
-        valType: 'any',
-        dflt: 0,
-        
-        editType: 'calc+clearAxisTypes',
-        anim: true,
-        
-    },
-    dy: {
-        valType: 'number',
-        dflt: 1,
-        
-        editType: 'calc',
-        anim: true,
-        
-    },
-
-    stackgroup: {
-        valType: 'string',
-        
-        dflt: '',
-        editType: 'calc',
-        
-    },
-    orientation: {
-        valType: 'enumerated',
-        
-        values: ['v', 'h'],
-        editType: 'calc',
-        
-    },
-    groupnorm: {
-        valType: 'enumerated',
-        values: ['', 'fraction', 'percent'],
-        dflt: '',
-        
-        editType: 'calc',
-        
-    },
-    stackgaps: {
-        valType: 'enumerated',
-        values: ['infer zero', 'interpolate'],
-        dflt: 'infer zero',
-        
-        editType: 'calc',
-        
-    },
-
-    text: {
-        valType: 'string',
-        
-        dflt: '',
-        arrayOk: true,
-        editType: 'calc',
-        
-    },
-
-    texttemplate: texttemplateAttrs({}, {
-
-    }),
-    hovertext: {
-        valType: 'string',
-        
-        dflt: '',
-        arrayOk: true,
-        editType: 'style',
-        
-    },
-    mode: {
-        valType: 'flaglist',
-        flags: ['lines', 'markers', 'text'],
-        extras: ['none'],
-        
-        editType: 'calc',
-        
-    },
-    hoveron: {
-        valType: 'flaglist',
-        flags: ['points', 'fills'],
-        
-        editType: 'style',
-        
-    },
-    hovertemplate: hovertemplateAttrs({}, {
-        keys: constants.eventDataKeys
-    }),
-    line: {
-        color: {
-            valType: 'color',
-            
-            editType: 'style',
-            anim: true,
-            
-        },
-        width: {
-            valType: 'number',
-            min: 0,
-            dflt: 2,
-            
-            editType: 'style',
-            anim: true,
-            
-        },
-        shape: {
-            valType: 'enumerated',
-            values: ['linear', 'spline', 'hv', 'vh', 'hvh', 'vhv'],
-            dflt: 'linear',
-            
-            editType: 'plot',
-            
-        },
-        smoothing: {
-            valType: 'number',
-            min: 0,
-            max: 1.3,
-            dflt: 1,
-            
-            editType: 'plot',
-            
-        },
-        dash: extendFlat({}, dash, {editType: 'style'}),
-        simplify: {
-            valType: 'boolean',
-            dflt: true,
-            
-            editType: 'plot',
-            
-        },
-        editType: 'plot'
-    },
-
-    connectgaps: {
-        valType: 'boolean',
-        dflt: false,
-        
-        editType: 'calc',
-        
-    },
-    cliponaxis: {
-        valType: 'boolean',
-        dflt: true,
-        
-        editType: 'plot',
-        
-    },
-
-    fill: {
-        valType: 'enumerated',
-        values: ['none', 'tozeroy', 'tozerox', 'tonexty', 'tonextx', 'toself', 'tonext'],
-        
-        editType: 'calc',
-        
-    },
-    fillcolor: {
-        valType: 'color',
-        
-        editType: 'style',
-        anim: true,
-        
-    },
-    marker: extendFlat({
-        symbol: {
-            valType: 'enumerated',
-            values: Drawing.symbolList,
-            dflt: 'circle',
-            arrayOk: true,
-            
-            editType: 'style',
-            
-        },
-        opacity: {
-            valType: 'number',
-            min: 0,
-            max: 1,
-            arrayOk: true,
-            
-            editType: 'style',
-            anim: true,
-            
-        },
-        size: {
-            valType: 'number',
-            min: 0,
-            dflt: 6,
-            arrayOk: true,
-            
-            editType: 'calc',
-            anim: true,
-            
-        },
-        maxdisplayed: {
-            valType: 'number',
-            min: 0,
-            dflt: 0,
-            
-            editType: 'plot',
-            
-        },
-        sizeref: {
-            valType: 'number',
-            dflt: 1,
-            
-            editType: 'calc',
-            
-        },
-        sizemin: {
-            valType: 'number',
-            min: 0,
-            dflt: 0,
-            
-            editType: 'calc',
-            
-        },
-        sizemode: {
-            valType: 'enumerated',
-            values: ['diameter', 'area'],
-            dflt: 'diameter',
-            
-            editType: 'calc',
-            
-        },
-
-        line: extendFlat({
-            width: {
-                valType: 'number',
-                min: 0,
-                arrayOk: true,
-                
-                editType: 'style',
-                anim: true,
-                
-            },
-            editType: 'calc'
-        },
-            colorScaleAttrs('marker.line', {anim: true})
-        ),
-        gradient: {
-            type: {
-                valType: 'enumerated',
-                values: ['radial', 'horizontal', 'vertical', 'none'],
-                arrayOk: true,
-                dflt: 'none',
-                
-                editType: 'calc',
-                
-            },
-            color: {
-                valType: 'color',
-                arrayOk: true,
-                
-                editType: 'calc',
-                
-            },
-            editType: 'calc'
-        },
-        editType: 'calc'
-    },
-        colorScaleAttrs('marker', {anim: true})
-    ),
-    selected: {
-        marker: {
-            opacity: {
-                valType: 'number',
-                min: 0,
-                max: 1,
-                
-                editType: 'style',
-                
-            },
-            color: {
-                valType: 'color',
-                
-                editType: 'style',
-                
-            },
-            size: {
-                valType: 'number',
-                min: 0,
-                
-                editType: 'style',
-                
-            },
-            editType: 'style'
-        },
-        textfont: {
-            color: {
-                valType: 'color',
-                
-                editType: 'style',
-                
-            },
-            editType: 'style'
-        },
-        editType: 'style'
-    },
-    unselected: {
-        marker: {
-            opacity: {
-                valType: 'number',
-                min: 0,
-                max: 1,
-                
-                editType: 'style',
-                
-            },
-            color: {
-                valType: 'color',
-                
-                editType: 'style',
-                
-            },
-            size: {
-                valType: 'number',
-                min: 0,
-                
-                editType: 'style',
-                
-            },
-            editType: 'style'
-        },
-        textfont: {
-            color: {
-                valType: 'color',
-                
-                editType: 'style',
-                
-            },
-            editType: 'style'
-        },
-        editType: 'style'
-    },
-
-    textposition: {
-        valType: 'enumerated',
-        values: [
-            'top left', 'top center', 'top right',
-            'middle left', 'middle center', 'middle right',
-            'bottom left', 'bottom center', 'bottom right'
-        ],
-        dflt: 'middle center',
-        arrayOk: true,
-        
-        editType: 'calc',
-        
-    },
-    textfont: fontAttrs({
-        editType: 'calc',
-        colorEditType: 'style',
-        arrayOk: true,
-        
-    }),
-
-    r: {
-        valType: 'data_array',
-        editType: 'calc',
-        
-    },
-    t: {
-        valType: 'data_array',
-        editType: 'calc',
-        
-    }
-};
-
-},{"../../components/colorscale/attributes":385,"../../components/drawing":400,"../../components/drawing/attributes":399,"../../lib/extend":500,"../../plots/font_attributes":580,"../../plots/template_attributes":605,"./constants":639}],636:[function(_dereq_,module,exports){
-/**
-* Copyright 2012-2020, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-'use strict';
-
-var isNumeric = _dereq_('fast-isnumeric');
-var Lib = _dereq_('../../lib');
-
-var Axes = _dereq_('../../plots/cartesian/axes');
-var BADNUM = _dereq_('../../constants/numerical').BADNUM;
-
-var subTypes = _dereq_('./subtypes');
-var calcColorscale = _dereq_('./colorscale_calc');
-var arraysToCalcdata = _dereq_('./arrays_to_calcdata');
-var calcSelection = _dereq_('./calc_selection');
-
-function calc(gd, trace) {
-    var fullLayout = gd._fullLayout;
-    var xa = Axes.getFromId(gd, trace.xaxis || 'x');
-    var ya = Axes.getFromId(gd, trace.yaxis || 'y');
-    var x = xa.makeCalcdata(trace, 'x');
-    var y = ya.makeCalcdata(trace, 'y');
-    var serieslen = trace._length;
-    var cd = new Array(serieslen);
-    var ids = trace.ids;
-    var stackGroupOpts = getStackOpts(trace, fullLayout, xa, ya);
-    var interpolateGaps = false;
-    var isV, i, j, k, interpolate, vali;
-
-    setFirstScatter(fullLayout, trace);
-
-    var xAttr = 'x';
-    var yAttr = 'y';
-    var posAttr;
-    if(stackGroupOpts) {
-        Lib.pushUnique(stackGroupOpts.traceIndices, trace._expandedIndex);
-        isV = stackGroupOpts.orientation === 'v';
-
-        // size, like we use for bar
-        if(isV) {
-            yAttr = 's';
-            posAttr = 'x';
-        } else {
-            xAttr = 's';
-            posAttr = 'y';
-        }
-        interpolate = stackGroupOpts.stackgaps === 'interpolate';
-    } else {
-        var ppad = calcMarkerSize(trace, serieslen);
-        calcAxisExpansion(gd, trace, xa, ya, x, y, ppad);
-    }
-
-    for(i = 0; i < serieslen; i++) {
-        var cdi = cd[i] = {};
-        var xValid = isNumeric(x[i]);
-        var yValid = isNumeric(y[i]);
-        if(xValid && yValid) {
-            cdi[xAttr] = x[i];
-            cdi[yAttr] = y[i];
-        } else if(stackGroupOpts && (isV ? xValid : yValid)) {
-            // if we're stacking we need to hold on to all valid positions
-            // even with invalid sizes
-
-            cdi[posAttr] = isV ? x[i] : y[i];
-            cdi.gap = true;
-            if(interpolate) {
-                cdi.s = BADNUM;
-                interpolateGaps = true;
-            } else {
-                cdi.s = 0;
-            }
-        } else {
-            cdi[xAttr] = cdi[yAttr] = BADNUM;
-        }
-
-        if(ids) {
-            cdi.id = String(ids[i]);
-        }
-    }
-
-    arraysToCalcdata(cd, trace);
-    calcColorscale(gd, trace);
-    calcSelection(cd, trace);
-
-    if(stackGroupOpts) {
-        // remove bad positions and sort
-        // note that original indices get added to cd in arraysToCalcdata
-        i = 0;
-        while(i < cd.length) {
-            if(cd[i][posAttr] === BADNUM) {
-                cd.splice(i, 1);
-            } else i++;
-        }
-
-        Lib.sort(cd, function(a, b) {
-            return (a[posAttr] - b[posAttr]) || (a.i - b.i);
-        });
-
-        if(interpolateGaps) {
-            // first fill the beginning with constant from the first point
-            i = 0;
-            while(i < cd.length - 1 && cd[i].gap) {
-                i++;
-            }
-            vali = cd[i].s;
-            if(!vali) vali = cd[i].s = 0; // in case of no data AT ALL in this trace - use 0
-            for(j = 0; j < i; j++) {
-                cd[j].s = vali;
-            }
-            // then fill the end with constant from the last point
-            k = cd.length - 1;
-            while(k > i && cd[k].gap) {
-                k--;
-            }
-            vali = cd[k].s;
-            for(j = cd.length - 1; j > k; j--) {
-                cd[j].s = vali;
-            }
-            // now interpolate internal gaps linearly
-            while(i < k) {
-                i++;
-                if(cd[i].gap) {
-                    j = i + 1;
-                    while(cd[j].gap) {
-                        j++;
-                    }
-                    var pos0 = cd[i - 1][posAttr];
-                    var size0 = cd[i - 1].s;
-                    var m = (cd[j].s - size0) / (cd[j][posAttr] - pos0);
-                    while(i < j) {
-                        cd[i].s = size0 + (cd[i][posAttr] - pos0) * m;
-                        i++;
-                    }
-                }
-            }
-        }
-    }
-
-    return cd;
-}
-
-function calcAxisExpansion(gd, trace, xa, ya, x, y, ppad) {
-    var serieslen = trace._length;
-    var fullLayout = gd._fullLayout;
-    var xId = xa._id;
-    var yId = ya._id;
-    var firstScatter = fullLayout._firstScatter[firstScatterGroup(trace)] === trace.uid;
-    var stackOrientation = (getStackOpts(trace, fullLayout, xa, ya) || {}).orientation;
-    var fill = trace.fill;
-
-    // cancel minimum tick spacings (only applies to bars and boxes)
-    xa._minDtick = 0;
-    ya._minDtick = 0;
-
-    // check whether bounds should be tight, padded, extended to zero...
-    // most cases both should be padded on both ends, so start with that.
-    var xOptions = {padded: true};
-    var yOptions = {padded: true};
-
-    if(ppad) {
-        xOptions.ppad = yOptions.ppad = ppad;
-    }
-
-    // TODO: text size
-
-    var openEnded = serieslen < 2 || (x[0] !== x[serieslen - 1]) || (y[0] !== y[serieslen - 1]);
-
-    if(openEnded && (
-        (fill === 'tozerox') ||
-        ((fill === 'tonextx') && (firstScatter || stackOrientation === 'h'))
-    )) {
-        // include zero (tight) and extremes (padded) if fill to zero
-        // (unless the shape is closed, then it's just filling the shape regardless)
-
-        xOptions.tozero = true;
-    } else if(!(trace.error_y || {}).visible && (
-        // if no error bars, markers or text, or fill to y=0 remove x padding
-
-            (fill === 'tonexty' || fill === 'tozeroy') ||
-            (!subTypes.hasMarkers(trace) && !subTypes.hasText(trace))
-        )) {
-        xOptions.padded = false;
-        xOptions.ppad = 0;
-    }
-
-    if(openEnded && (
-        (fill === 'tozeroy') ||
-        ((fill === 'tonexty') && (firstScatter || stackOrientation === 'v'))
-    )) {
-        // now check for y - rather different logic, though still mostly padded both ends
-        // include zero (tight) and extremes (padded) if fill to zero
-        // (unless the shape is closed, then it's just filling the shape regardless)
-
-        yOptions.tozero = true;
-    } else if(fill === 'tonextx' || fill === 'tozerox') {
-        // tight y: any x fill
-
-        yOptions.padded = false;
-    }
-
-    // N.B. asymmetric splom traces call this with blank {} xa or ya
-    if(xId) trace._extremes[xId] = Axes.findExtremes(xa, x, xOptions);
-    if(yId) trace._extremes[yId] = Axes.findExtremes(ya, y, yOptions);
-}
-
-function calcMarkerSize(trace, serieslen) {
-    if(!subTypes.hasMarkers(trace)) return;
-
-    // Treat size like x or y arrays --- Run d2c
-    // this needs to go before ppad computation
-    var marker = trace.marker;
-    var sizeref = 1.6 * (trace.marker.sizeref || 1);
-    var markerTrans;
-
-    if(trace.marker.sizemode === 'area') {
-        markerTrans = function(v) {
-            return Math.max(Math.sqrt((v || 0) / sizeref), 3);
-        };
-    } else {
-        markerTrans = function(v) {
-            return Math.max((v || 0) / sizeref, 3);
-        };
-    }
-
-    if(Lib.isArrayOrTypedArray(marker.size)) {
-        // I tried auto-type but category and dates dont make much sense.
-        var ax = {type: 'linear'};
-        Axes.setConvert(ax);
-
-        var s = ax.makeCalcdata(trace.marker, 'size');
-
-        var sizeOut = new Array(serieslen);
-        for(var i = 0; i < serieslen; i++) {
-            sizeOut[i] = markerTrans(s[i]);
-        }
-        return sizeOut;
-    } else {
-        return markerTrans(marker.size);
-    }
-}
-
-/**
- * mark the first scatter trace for each subplot
- * note that scatter and scattergl each get their own first trace
- * note also that I'm doing this during calc rather than supplyDefaults
- * so I don't need to worry about transforms, but if we ever do
- * per-trace calc this will get confused.
- */
-function setFirstScatter(fullLayout, trace) {
-    var group = firstScatterGroup(trace);
-    var firstScatter = fullLayout._firstScatter;
-    if(!firstScatter[group]) firstScatter[group] = trace.uid;
-}
-
-function firstScatterGroup(trace) {
-    var stackGroup = trace.stackgroup;
-    return trace.xaxis + trace.yaxis + trace.type +
-        (stackGroup ? '-' + stackGroup : '');
-}
-
-function getStackOpts(trace, fullLayout, xa, ya) {
-    var stackGroup = trace.stackgroup;
-    if(!stackGroup) return;
-    var stackOpts = fullLayout._scatterStackOpts[xa._id + ya._id][stackGroup];
-    var stackAx = stackOpts.orientation === 'v' ? ya : xa;
-    // Allow stacking only on numeric axes
-    // calc is a little late to be figuring this out, but during supplyDefaults
-    // we don't know the axis type yet
-    if(stackAx.type === 'linear' || stackAx.type === 'log') return stackOpts;
-}
-
-module.exports = {
-    calc: calc,
-    calcMarkerSize: calcMarkerSize,
-    calcAxisExpansion: calcAxisExpansion,
-    setFirstScatter: setFirstScatter,
-    getStackOpts: getStackOpts
-};
-
-},{"../../constants/numerical":485,"../../lib":506,"../../plots/cartesian/axes":552,"./arrays_to_calcdata":634,"./calc_selection":637,"./colorscale_calc":638,"./subtypes":659,"fast-isnumeric":90}],637:[function(_dereq_,module,exports){
-/**
-* Copyright 2012-2020, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-'use strict';
-
-var Lib = _dereq_('../../lib');
-
-module.exports = function calcSelection(cd, trace) {
-    if(Lib.isArrayOrTypedArray(trace.selectedpoints)) {
-        Lib.tagSelected(cd, trace);
-    }
-};
-
-},{"../../lib":506}],638:[function(_dereq_,module,exports){
-/**
-* Copyright 2012-2020, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-'use strict';
-
-var hasColorscale = _dereq_('../../components/colorscale/helpers').hasColorscale;
-var calcColorscale = _dereq_('../../components/colorscale/calc');
-
-var subTypes = _dereq_('./subtypes');
-
-module.exports = function calcMarkerColorscale(gd, trace) {
-    if(subTypes.hasLines(trace) && hasColorscale(trace, 'line')) {
-        calcColorscale(gd, trace, {
-            vals: trace.line.color,
-            containerStr: 'line',
-            cLetter: 'c'
-        });
-    }
-
-    if(subTypes.hasMarkers(trace)) {
-        if(hasColorscale(trace, 'marker')) {
-            calcColorscale(gd, trace, {
-                vals: trace.marker.color,
-                containerStr: 'marker',
-                cLetter: 'c'
-            });
-        }
-        if(hasColorscale(trace, 'marker.line')) {
-            calcColorscale(gd, trace, {
-                vals: trace.marker.line.color,
-                containerStr: 'marker.line',
-                cLetter: 'c'
-            });
-        }
-    }
-};
-
-},{"../../components/colorscale/calc":386,"../../components/colorscale/helpers":389,"./subtypes":659}],639:[function(_dereq_,module,exports){
-/**
-* Copyright 2012-2020, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-
-'use strict';
-
-module.exports = {
-    PTS_LINESONLY: 20,
-
-    // fixed parameters of clustering and clipping algorithms
-
-    // fraction of clustering tolerance "so close we don't even consider it a new point"
-    minTolerance: 0.2,
-    // how fast does clustering tolerance increase as you get away from the visible region
-    toleranceGrowth: 10,
-
-    // number of viewport sizes away from the visible region
-    // at which we clip all lines to the perimeter
-    maxScreensAway: 20,
-
-    eventDataKeys: []
-};
-
-},{}],640:[function(_dereq_,module,exports){
-/**
-* Copyright 2012-2020, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-
-'use strict';
-
-var calc = _dereq_('./calc');
-
-/*
- * Scatter stacking & normalization calculations
- * runs per subplot, and can handle multiple stacking groups
- */
-
-module.exports = function crossTraceCalc(gd, plotinfo) {
-    var xa = plotinfo.xaxis;
-    var ya = plotinfo.yaxis;
-    var subplot = xa._id + ya._id;
-
-    var subplotStackOpts = gd._fullLayout._scatterStackOpts[subplot];
-    if(!subplotStackOpts) return;
-
-    var calcTraces = gd.calcdata;
-
-    var i, j, k, i2, cd, cd0, posj, sumj, norm;
-    var groupOpts, interpolate, groupnorm, posAttr, valAttr;
-    var hasAnyBlanks;
-
-    for(var stackGroup in subplotStackOpts) {
-        groupOpts = subplotStackOpts[stackGroup];
-        var indices = groupOpts.traceIndices;
-
-        // can get here with no indices if the stack axis is non-numeric
-        if(!indices.length) continue;
-
-        interpolate = groupOpts.stackgaps === 'interpolate';
-        groupnorm = groupOpts.groupnorm;
-        if(groupOpts.orientation === 'v') {
-            posAttr = 'x';
-            valAttr = 'y';
-        } else {
-            posAttr = 'y';
-            valAttr = 'x';
-        }
-        hasAnyBlanks = new Array(indices.length);
-        for(i = 0; i < hasAnyBlanks.length; i++) {
-            hasAnyBlanks[i] = false;
-        }
-
-        // Collect the complete set of all positions across ALL traces.
-        // Start with the first trace, then interleave items from later traces
-        // as needed.
-        // Fill in mising items as we go.
-        cd0 = calcTraces[indices[0]];
-        var allPositions = new Array(cd0.length);
-        for(i = 0; i < cd0.length; i++) {
-            allPositions[i] = cd0[i][posAttr];
-        }
-
-        for(i = 1; i < indices.length; i++) {
-            cd = calcTraces[indices[i]];
-
-            for(j = k = 0; j < cd.length; j++) {
-                posj = cd[j][posAttr];
-                for(; posj > allPositions[k] && k < allPositions.length; k++) {
-                    // the current trace is missing a position from some previous trace(s)
-                    insertBlank(cd, j, allPositions[k], i, hasAnyBlanks, interpolate, posAttr);
-                    j++;
-                }
-                if(posj !== allPositions[k]) {
-                    // previous trace(s) are missing a position from the current trace
-                    for(i2 = 0; i2 < i; i2++) {
-                        insertBlank(calcTraces[indices[i2]], k, posj, i2, hasAnyBlanks, interpolate, posAttr);
-                    }
-                    allPositions.splice(k, 0, posj);
-                }
-                k++;
-            }
-            for(; k < allPositions.length; k++) {
-                insertBlank(cd, j, allPositions[k], i, hasAnyBlanks, interpolate, posAttr);
-                j++;
-            }
-        }
-
-        var serieslen = allPositions.length;
-
-        // stack (and normalize)!
-        for(j = 0; j < cd0.length; j++) {
-            sumj = cd0[j][valAttr] = cd0[j].s;
-            for(i = 1; i < indices.length; i++) {
-                cd = calcTraces[indices[i]];
-                cd[0].trace._rawLength = cd[0].trace._length;
-                cd[0].trace._length = serieslen;
-                sumj += cd[j].s;
-                cd[j][valAttr] = sumj;
-            }
-
-            if(groupnorm) {
-                norm = ((groupnorm === 'fraction') ? sumj : (sumj / 100)) || 1;
-                for(i = 0; i < indices.length; i++) {
-                    var cdj = calcTraces[indices[i]][j];
-                    cdj[valAttr] /= norm;
-                    cdj.sNorm = cdj.s / norm;
-                }
-            }
-        }
-
-        // autorange
-        for(i = 0; i < indices.length; i++) {
-            cd = calcTraces[indices[i]];
-            var trace = cd[0].trace;
-            var ppad = calc.calcMarkerSize(trace, trace._rawLength);
-            var arrayPad = Array.isArray(ppad);
-            if((ppad && hasAnyBlanks[i]) || arrayPad) {
-                var ppadRaw = ppad;
-                ppad = new Array(serieslen);
-                for(j = 0; j < serieslen; j++) {
-                    ppad[j] = cd[j].gap ? 0 : (arrayPad ? ppadRaw[cd[j].i] : ppadRaw);
-                }
-            }
-            var x = new Array(serieslen);
-            var y = new Array(serieslen);
-            for(j = 0; j < serieslen; j++) {
-                x[j] = cd[j].x;
-                y[j] = cd[j].y;
-            }
-            calc.calcAxisExpansion(gd, trace, xa, ya, x, y, ppad);
-
-            // while we're here (in a loop over all traces in the stack)
-            // record the orientation, so hover can find it easily
-            cd[0].t.orientation = groupOpts.orientation;
-        }
-    }
-};
-
-function insertBlank(calcTrace, index, position, traceIndex, hasAnyBlanks, interpolate, posAttr) {
-    hasAnyBlanks[traceIndex] = true;
-    var newEntry = {
-        i: null,
-        gap: true,
-        s: 0
-    };
-    newEntry[posAttr] = position;
-    calcTrace.splice(index, 0, newEntry);
-    // Even if we're not interpolating, if one trace has multiple
-    // values at the same position and this trace only has one value there,
-    // we just duplicate that one value rather than insert a zero.
-    // We also make it look like a real point - because it's ambiguous which
-    // one really is the real one!
-    if(index && position === calcTrace[index - 1][posAttr]) {
-        var prevEntry = calcTrace[index - 1];
-        newEntry.s = prevEntry.s;
-        // TODO is it going to cause any problems to have multiple
-        // calcdata points with the same index?
-        newEntry.i = prevEntry.i;
-        newEntry.gap = prevEntry.gap;
-    } else if(interpolate) {
-        newEntry.s = getInterp(calcTrace, index, position, posAttr);
-    }
-    if(!index) {
-        // t and trace need to stay on the first cd entry
-        calcTrace[0].t = calcTrace[1].t;
-        calcTrace[0].trace = calcTrace[1].trace;
-        delete calcTrace[1].t;
-        delete calcTrace[1].trace;
-    }
-}
-
-function getInterp(calcTrace, index, position, posAttr) {
-    var pt0 = calcTrace[index - 1];
-    var pt1 = calcTrace[index + 1];
-    if(!pt1) return pt0.s;
-    if(!pt0) return pt1.s;
-    return pt0.s + (pt1.s - pt0.s) * (position - pt0[posAttr]) / (pt1[posAttr] - pt0[posAttr]);
-}
-
-},{"./calc":636}],641:[function(_dereq_,module,exports){
-/**
-* Copyright 2012-2020, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-
-'use strict';
-
-
-// remove opacity for any trace that has a fill or is filled to
-module.exports = function crossTraceDefaults(fullData) {
-    for(var i = 0; i < fullData.length; i++) {
-        var tracei = fullData[i];
-        if(tracei.type !== 'scatter') continue;
-
-        var filli = tracei.fill;
-        if(filli === 'none' || filli === 'toself') continue;
-
-        tracei.opacity = undefined;
-
-        if(filli === 'tonexty' || filli === 'tonextx') {
-            for(var j = i - 1; j >= 0; j--) {
-                var tracej = fullData[j];
-
-                if((tracej.type === 'scatter') &&
-                        (tracej.xaxis === tracei.xaxis) &&
-                        (tracej.yaxis === tracei.yaxis)) {
-                    tracej.opacity = undefined;
-                    break;
-                }
-            }
-        }
-    }
-};
-
-},{}],642:[function(_dereq_,module,exports){
-/**
-* Copyright 2012-2020, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-'use strict';
-
-var Lib = _dereq_('../../lib');
-var Registry = _dereq_('../../registry');
-
-var attributes = _dereq_('./attributes');
-var constants = _dereq_('./constants');
-var subTypes = _dereq_('./subtypes');
-var handleXYDefaults = _dereq_('./xy_defaults');
-var handleStackDefaults = _dereq_('./stack_defaults');
-var handleMarkerDefaults = _dereq_('./marker_defaults');
-var handleLineDefaults = _dereq_('./line_defaults');
-var handleLineShapeDefaults = _dereq_('./line_shape_defaults');
-var handleTextDefaults = _dereq_('./text_defaults');
-var handleFillColorDefaults = _dereq_('./fillcolor_defaults');
-
-module.exports = function supplyDefaults(traceIn, traceOut, defaultColor, layout) {
-    function coerce(attr, dflt) {
-        return Lib.coerce(traceIn, traceOut, attributes, attr, dflt);
-    }
-
-    var len = handleXYDefaults(traceIn, traceOut, layout, coerce);
-    if(!len) traceOut.visible = false;
-
-    if(!traceOut.visible) return;
-
-    var stackGroupOpts = handleStackDefaults(traceIn, traceOut, layout, coerce);
-
-    var defaultMode = !stackGroupOpts && (len < constants.PTS_LINESONLY) ?
-        'lines+markers' : 'lines';
-    coerce('text');
-    coerce('hovertext');
-    coerce('mode', defaultMode);
-
-    if(subTypes.hasLines(traceOut)) {
-        handleLineDefaults(traceIn, traceOut, defaultColor, layout, coerce);
-        handleLineShapeDefaults(traceIn, traceOut, coerce);
-        coerce('connectgaps');
-        coerce('line.simplify');
-    }
-
-    if(subTypes.hasMarkers(traceOut)) {
-        handleMarkerDefaults(traceIn, traceOut, defaultColor, layout, coerce, {gradient: true});
-    }
-
-    if(subTypes.hasText(traceOut)) {
-        coerce('texttemplate');
-        handleTextDefaults(traceIn, traceOut, layout, coerce);
-    }
-
-    var dfltHoverOn = [];
-
-    if(subTypes.hasMarkers(traceOut) || subTypes.hasText(traceOut)) {
-        coerce('cliponaxis');
-        coerce('marker.maxdisplayed');
-        dfltHoverOn.push('points');
-    }
-
-    // It's possible for this default to be changed by a later trace.
-    // We handle that case in some hacky code inside handleStackDefaults.
-    coerce('fill', stackGroupOpts ? stackGroupOpts.fillDflt : 'none');
-    if(traceOut.fill !== 'none') {
-        handleFillColorDefaults(traceIn, traceOut, defaultColor, coerce);
-        if(!subTypes.hasLines(traceOut)) handleLineShapeDefaults(traceIn, traceOut, coerce);
-    }
-
-    var lineColor = (traceOut.line || {}).color;
-    var markerColor = (traceOut.marker || {}).color;
-
-    if(traceOut.fill === 'tonext' || traceOut.fill === 'toself') {
-        dfltHoverOn.push('fills');
-    }
-    coerce('hoveron', dfltHoverOn.join('+') || 'points');
-    if(traceOut.hoveron !== 'fills') coerce('hovertemplate');
-    var errorBarsSupplyDefaults = Registry.getComponentMethod('errorbars', 'supplyDefaults');
-    errorBarsSupplyDefaults(traceIn, traceOut, lineColor || markerColor || defaultColor, {axis: 'y'});
-    errorBarsSupplyDefaults(traceIn, traceOut, lineColor || markerColor || defaultColor, {axis: 'x', inherit: 'y'});
-
-    Lib.coerceSelectionMarkerOpacity(traceOut, coerce);
-};
-
-},{"../../lib":506,"../../registry":606,"./attributes":635,"./constants":639,"./fillcolor_defaults":643,"./line_defaults":648,"./line_shape_defaults":650,"./marker_defaults":654,"./stack_defaults":657,"./subtypes":659,"./text_defaults":660,"./xy_defaults":661}],643:[function(_dereq_,module,exports){
-/**
-* Copyright 2012-2020, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-
-'use strict';
-
-var Color = _dereq_('../../components/color');
-var isArrayOrTypedArray = _dereq_('../../lib').isArrayOrTypedArray;
-
-module.exports = function fillColorDefaults(traceIn, traceOut, defaultColor, coerce) {
-    var inheritColorFromMarker = false;
-
-    if(traceOut.marker) {
-        // don't try to inherit a color array
-        var markerColor = traceOut.marker.color;
-        var markerLineColor = (traceOut.marker.line || {}).color;
-
-        if(markerColor && !isArrayOrTypedArray(markerColor)) {
-            inheritColorFromMarker = markerColor;
-        } else if(markerLineColor && !isArrayOrTypedArray(markerLineColor)) {
-            inheritColorFromMarker = markerLineColor;
-        }
-    }
-
-    coerce('fillcolor', Color.addOpacity(
-        (traceOut.line || {}).color ||
-        inheritColorFromMarker ||
-        defaultColor, 0.5
-    ));
-};
-
-},{"../../components/color":378,"../../lib":506}],644:[function(_dereq_,module,exports){
-/**
-* Copyright 2012-2020, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-'use strict';
-
-var Axes = _dereq_('../../plots/cartesian/axes');
-
-module.exports = function formatLabels(cdi, trace, fullLayout) {
-    var labels = {};
-
-    var mockGd = {_fullLayout: fullLayout};
-    var xa = Axes.getFromTrace(mockGd, trace, 'x');
-    var ya = Axes.getFromTrace(mockGd, trace, 'y');
-
-    labels.xLabel = Axes.tickText(xa, cdi.x, true).text;
-    labels.yLabel = Axes.tickText(ya, cdi.y, true).text;
-
-    return labels;
-};
-
-},{"../../plots/cartesian/axes":552}],645:[function(_dereq_,module,exports){
-/**
-* Copyright 2012-2020, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-
-'use strict';
-
-var Color = _dereq_('../../components/color');
-var subtypes = _dereq_('./subtypes');
-
-
-module.exports = function getTraceColor(trace, di) {
-    var lc, tc;
-
-    // TODO: text modes
-
-    if(trace.mode === 'lines') {
-        lc = trace.line.color;
-        return (lc && Color.opacity(lc)) ?
-            lc : trace.fillcolor;
-    } else if(trace.mode === 'none') {
-        return trace.fill ? trace.fillcolor : '';
-    } else {
-        var mc = di.mcc || (trace.marker || {}).color;
-        var mlc = di.mlcc || ((trace.marker || {}).line || {}).color;
-
-        tc = (mc && Color.opacity(mc)) ? mc :
-            (mlc && Color.opacity(mlc) &&
-                (di.mlw || ((trace.marker || {}).line || {}).width)) ? mlc : '';
-
-        if(tc) {
-            // make sure the points aren't TOO transparent
-            if(Color.opacity(tc) < 0.3) {
-                return Color.addOpacity(tc, 0.3);
-            } else return tc;
-        } else {
-            lc = (trace.line || {}).color;
-            return (lc && Color.opacity(lc) &&
-                subtypes.hasLines(trace) && trace.line.width) ?
-                    lc : trace.fillcolor;
-        }
-    }
-};
-
-},{"../../components/color":378,"./subtypes":659}],646:[function(_dereq_,module,exports){
-/**
-* Copyright 2012-2020, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-'use strict';
-
-var Lib = _dereq_('../../lib');
-var Fx = _dereq_('../../components/fx');
-var Registry = _dereq_('../../registry');
-var getTraceColor = _dereq_('./get_trace_color');
-var Color = _dereq_('../../components/color');
-var fillText = Lib.fillText;
-
-module.exports = function hoverPoints(pointData, xval, yval, hovermode) {
-    var cd = pointData.cd;
-    var trace = cd[0].trace;
-    var xa = pointData.xa;
-    var ya = pointData.ya;
-    var xpx = xa.c2p(xval);
-    var ypx = ya.c2p(yval);
-    var pt = [xpx, ypx];
-    var hoveron = trace.hoveron || '';
-    var minRad = (trace.mode.indexOf('markers') !== -1) ? 3 : 0.5;
-
-    // look for points to hover on first, then take fills only if we
-    // didn't find a point
-    if(hoveron.indexOf('points') !== -1) {
-        var dx = function(di) {
-            // dx and dy are used in compare modes - here we want to always
-            // prioritize the closest data point, at least as long as markers are
-            // the same size or nonexistent, but still try to prioritize small markers too.
-            var rad = Math.max(3, di.mrc || 0);
-            var kink = 1 - 1 / rad;
-            var dxRaw = Math.abs(xa.c2p(di.x) - xpx);
-            var d = (dxRaw < rad) ? (kink * dxRaw / rad) : (dxRaw - rad + kink);
-            return d;
-        };
-        var dy = function(di) {
-            var rad = Math.max(3, di.mrc || 0);
-            var kink = 1 - 1 / rad;
-            var dyRaw = Math.abs(ya.c2p(di.y) - ypx);
-            return (dyRaw < rad) ? (kink * dyRaw / rad) : (dyRaw - rad + kink);
-        };
-        var dxy = function(di) {
-            // scatter points: d.mrc is the calculated marker radius
-            // adjust the distance so if you're inside the marker it
-            // always will show up regardless of point size, but
-            // prioritize smaller points
-            var rad = Math.max(minRad, di.mrc || 0);
-            var dx = xa.c2p(di.x) - xpx;
-            var dy = ya.c2p(di.y) - ypx;
-            return Math.max(Math.sqrt(dx * dx + dy * dy) - rad, 1 - minRad / rad);
-        };
-        var distfn = Fx.getDistanceFunction(hovermode, dx, dy, dxy);
-
-        Fx.getClosest(cd, distfn, pointData);
-
-        // skip the rest (for this trace) if we didn't find a close point
-        if(pointData.index !== false) {
-            // the closest data point
-            var di = cd[pointData.index];
-            var xc = xa.c2p(di.x, true);
-            var yc = ya.c2p(di.y, true);
-            var rad = di.mrc || 1;
-
-            // now we're done using the whole `calcdata` array, replace the
-            // index with the original index (in case of inserted point from
-            // stacked area)
-            pointData.index = di.i;
-
-            var orientation = cd[0].t.orientation;
-            // TODO: for scatter and bar, option to show (sub)totals and
-            // raw data? Currently stacked and/or normalized bars just show
-            // the normalized individual sizes, so that's what I'm doing here
-            // for now.
-            var sizeVal = orientation && (di.sNorm || di.s);
-            var xLabelVal = (orientation === 'h') ? sizeVal : di.x;
-            var yLabelVal = (orientation === 'v') ? sizeVal : di.y;
-
-            Lib.extendFlat(pointData, {
-                color: getTraceColor(trace, di),
-
-                x0: xc - rad,
-                x1: xc + rad,
-                xLabelVal: xLabelVal,
-
-                y0: yc - rad,
-                y1: yc + rad,
-                yLabelVal: yLabelVal,
-
-                spikeDistance: dxy(di),
-                hovertemplate: trace.hovertemplate
-            });
-
-            fillText(di, trace, pointData);
-            Registry.getComponentMethod('errorbars', 'hoverInfo')(di, trace, pointData);
-
-            return [pointData];
-        }
-    }
-
-    // even if hoveron is 'fills', only use it if we have polygons too
-    if(hoveron.indexOf('fills') !== -1 && trace._polygons) {
-        var polygons = trace._polygons;
-        var polygonsIn = [];
-        var inside = false;
-        var xmin = Infinity;
-        var xmax = -Infinity;
-        var ymin = Infinity;
-        var ymax = -Infinity;
-
-        var i, j, polygon, pts, xCross, x0, x1, y0, y1;
-
-        for(i = 0; i < polygons.length; i++) {
-            polygon = polygons[i];
-            // TODO: this is not going to work right for curved edges, it will
-            // act as though they're straight. That's probably going to need
-            // the elements themselves to capture the events. Worth it?
-            if(polygon.contains(pt)) {
-                inside = !inside;
-                // TODO: need better than just the overall bounding box
-                polygonsIn.push(polygon);
-                ymin = Math.min(ymin, polygon.ymin);
-                ymax = Math.max(ymax, polygon.ymax);
-            }
-        }
-
-        if(inside) {
-            // constrain ymin/max to the visible plot, so the label goes
-            // at the middle of the piece you can see
-            ymin = Math.max(ymin, 0);
-            ymax = Math.min(ymax, ya._length);
-
-            // find the overall left-most and right-most points of the
-            // polygon(s) we're inside at their combined vertical midpoint.
-            // This is where we will draw the hover label.
-            // Note that this might not be the vertical midpoint of the
-            // whole trace, if it's disjoint.
-            var yAvg = (ymin + ymax) / 2;
-            for(i = 0; i < polygonsIn.length; i++) {
-                pts = polygonsIn[i].pts;
-                for(j = 1; j < pts.length; j++) {
-                    y0 = pts[j - 1][1];
-                    y1 = pts[j][1];
-                    if((y0 > yAvg) !== (y1 >= yAvg)) {
-                        x0 = pts[j - 1][0];
-                        x1 = pts[j][0];
-                        if(y1 - y0) {
-                            xCross = x0 + (x1 - x0) * (yAvg - y0) / (y1 - y0);
-                            xmin = Math.min(xmin, xCross);
-                            xmax = Math.max(xmax, xCross);
-                        }
-                    }
-                }
-            }
-
-            // constrain xmin/max to the visible plot now too
-            xmin = Math.max(xmin, 0);
-            xmax = Math.min(xmax, xa._length);
-
-            // get only fill or line color for the hover color
-            var color = Color.defaultLine;
-            if(Color.opacity(trace.fillcolor)) color = trace.fillcolor;
-            else if(Color.opacity((trace.line || {}).color)) {
-                color = trace.line.color;
-            }
-
-            Lib.extendFlat(pointData, {
-                // never let a 2D override 1D type as closest point
-                // also: no spikeDistance, it's not allowed for fills
-                distance: pointData.maxHoverDistance,
-                x0: xmin,
-                x1: xmax,
-                y0: yAvg,
-                y1: yAvg,
-                color: color,
-                hovertemplate: false
-            });
-
-            delete pointData.index;
-
-            if(trace.text && !Array.isArray(trace.text)) {
-                pointData.text = String(trace.text);
-            } else pointData.text = trace.name;
-
-            return [pointData];
-        }
-    }
-};
-
-},{"../../components/color":378,"../../components/fx":418,"../../lib":506,"../../registry":606,"./get_trace_color":645}],647:[function(_dereq_,module,exports){
-/**
-* Copyright 2012-2020, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-'use strict';
-
-var subtypes = _dereq_('./subtypes');
-
-module.exports = {
-    hasLines: subtypes.hasLines,
-    hasMarkers: subtypes.hasMarkers,
-    hasText: subtypes.hasText,
-    isBubble: subtypes.isBubble,
-
-    attributes: _dereq_('./attributes'),
-    supplyDefaults: _dereq_('./defaults'),
-    crossTraceDefaults: _dereq_('./cross_trace_defaults'),
-    calc: _dereq_('./calc').calc,
-    crossTraceCalc: _dereq_('./cross_trace_calc'),
-    arraysToCalcdata: _dereq_('./arrays_to_calcdata'),
-    plot: _dereq_('./plot'),
-    colorbar: _dereq_('./marker_colorbar'),
-    formatLabels: _dereq_('./format_labels'),
-    style: _dereq_('./style').style,
-    styleOnSelect: _dereq_('./style').styleOnSelect,
-    hoverPoints: _dereq_('./hover'),
-    selectPoints: _dereq_('./select'),
-    animatable: true,
-
-    moduleType: 'trace',
-    name: 'scatter',
-    basePlotModule: _dereq_('../../plots/cartesian'),
-    categories: [
-        'cartesian', 'svg', 'symbols', 'errorBarsOK', 'showLegend', 'scatter-like',
-        'zoomScale'
-    ],
-    meta: {
-        
-    }
-};
-
-},{"../../plots/cartesian":565,"./arrays_to_calcdata":634,"./attributes":635,"./calc":636,"./cross_trace_calc":640,"./cross_trace_defaults":641,"./defaults":642,"./format_labels":644,"./hover":646,"./marker_colorbar":653,"./plot":655,"./select":656,"./style":658,"./subtypes":659}],648:[function(_dereq_,module,exports){
-/**
-* Copyright 2012-2020, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-'use strict';
-
-var isArrayOrTypedArray = _dereq_('../../lib').isArrayOrTypedArray;
-var hasColorscale = _dereq_('../../components/colorscale/helpers').hasColorscale;
-var colorscaleDefaults = _dereq_('../../components/colorscale/defaults');
-
-module.exports = function lineDefaults(traceIn, traceOut, defaultColor, layout, coerce, opts) {
-    var markerColor = (traceIn.marker || {}).color;
-
-    coerce('line.color', defaultColor);
-
-    if(hasColorscale(traceIn, 'line')) {
-        colorscaleDefaults(traceIn, traceOut, layout, coerce, {prefix: 'line.', cLetter: 'c'});
-    } else {
-        var lineColorDflt = (isArrayOrTypedArray(markerColor) ? false : markerColor) || defaultColor;
-        coerce('line.color', lineColorDflt);
-    }
-
-    coerce('line.width');
-    if(!(opts || {}).noDash) coerce('line.dash');
-};
-
-},{"../../components/colorscale/defaults":388,"../../components/colorscale/helpers":389,"../../lib":506}],649:[function(_dereq_,module,exports){
-/**
-* Copyright 2012-2020, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-
-'use strict';
-
-var numConstants = _dereq_('../../constants/numerical');
-var BADNUM = numConstants.BADNUM;
-var LOG_CLIP = numConstants.LOG_CLIP;
-var LOG_CLIP_PLUS = LOG_CLIP + 0.5;
-var LOG_CLIP_MINUS = LOG_CLIP - 0.5;
-var Lib = _dereq_('../../lib');
-var segmentsIntersect = Lib.segmentsIntersect;
-var constrain = Lib.constrain;
-var constants = _dereq_('./constants');
-
-
-module.exports = function linePoints(d, opts) {
-    var xa = opts.xaxis;
-    var ya = opts.yaxis;
-    var xLog = xa.type === 'log';
-    var yLog = ya.type === 'log';
-    var xLen = xa._length;
-    var yLen = ya._length;
-    var connectGaps = opts.connectGaps;
-    var baseTolerance = opts.baseTolerance;
-    var shape = opts.shape;
-    var linear = shape === 'linear';
-    var fill = opts.fill && opts.fill !== 'none';
-    var segments = [];
-    var minTolerance = constants.minTolerance;
-    var len = d.length;
-    var pts = new Array(len);
-    var pti = 0;
-
-    var i;
-
-    // pt variables are pixel coordinates [x,y] of one point
-    // these four are the outputs of clustering on a line
-    var clusterStartPt, clusterEndPt, clusterHighPt, clusterLowPt;
-
-    // "this" is the next point we're considering adding to the cluster
-    var thisPt;
-
-    // did we encounter the high point first, then a low point, or vice versa?
-    var clusterHighFirst;
-
-    // the first two points in the cluster determine its unit vector
-    // so the second is always in the "High" direction
-    var clusterUnitVector;
-
-    // the pixel delta from clusterStartPt
-    var thisVector;
-
-    // val variables are (signed) pixel distances along the cluster vector
-    var clusterRefDist, clusterHighVal, clusterLowVal, thisVal;
-
-    // deviation variables are (signed) pixel distances normal to the cluster vector
-    var clusterMinDeviation, clusterMaxDeviation, thisDeviation;
-
-    // turn one calcdata point into pixel coordinates
-    function getPt(index) {
-        var di = d[index];
-        if(!di) return false;
-        var x = opts.linearized ? xa.l2p(di.x) : xa.c2p(di.x);
-        var y = opts.linearized ? ya.l2p(di.y) : ya.c2p(di.y);
-
-        // if non-positive log values, set them VERY far off-screen
-        // so the line looks essentially straight from the previous point.
-        if(x === BADNUM) {
-            if(xLog) x = xa.c2p(di.x, true);
-            if(x === BADNUM) return false;
-            // If BOTH were bad log values, make the line follow a constant
-            // exponent rather than a constant slope
-            if(yLog && y === BADNUM) {
-                x *= Math.abs(xa._m * yLen * (xa._m > 0 ? LOG_CLIP_PLUS : LOG_CLIP_MINUS) /
-                    (ya._m * xLen * (ya._m > 0 ? LOG_CLIP_PLUS : LOG_CLIP_MINUS)));
-            }
-            x *= 1000;
-        }
-        if(y === BADNUM) {
-            if(yLog) y = ya.c2p(di.y, true);
-            if(y === BADNUM) return false;
-            y *= 1000;
-        }
-        return [x, y];
-    }
-
-    function crossesViewport(xFrac0, yFrac0, xFrac1, yFrac1) {
-        var dx = xFrac1 - xFrac0;
-        var dy = yFrac1 - yFrac0;
-        var dx0 = 0.5 - xFrac0;
-        var dy0 = 0.5 - yFrac0;
-        var norm2 = dx * dx + dy * dy;
-        var dot = dx * dx0 + dy * dy0;
-        if(dot > 0 && dot < norm2) {
-            var cross = dx0 * dy - dy0 * dx;
-            if(cross * cross < norm2) return true;
-        }
-    }
-
-    var latestXFrac, latestYFrac;
-    // if we're off-screen, increase tolerance over baseTolerance
-    function getTolerance(pt, nextPt) {
-        var xFrac = pt[0] / xLen;
-        var yFrac = pt[1] / yLen;
-        var offScreenFraction = Math.max(0, -xFrac, xFrac - 1, -yFrac, yFrac - 1);
-        if(offScreenFraction && (latestXFrac !== undefined) &&
-            crossesViewport(xFrac, yFrac, latestXFrac, latestYFrac)
-        ) {
-            offScreenFraction = 0;
-        }
-        if(offScreenFraction && nextPt &&
-            crossesViewport(xFrac, yFrac, nextPt[0] / xLen, nextPt[1] / yLen)
-        ) {
-            offScreenFraction = 0;
-        }
-
-        return (1 + constants.toleranceGrowth * offScreenFraction) * baseTolerance;
-    }
-
-    function ptDist(pt1, pt2) {
-        var dx = pt1[0] - pt2[0];
-        var dy = pt1[1] - pt2[1];
-        return Math.sqrt(dx * dx + dy * dy);
-    }
-
-    // last bit of filtering: clip paths that are VERY far off-screen
-    // so we don't get near the browser's hard limit (+/- 2^29 px in Chrome and FF)
-
-    var maxScreensAway = constants.maxScreensAway;
-
-    // find the intersections between the segment from pt1 to pt2
-    // and the large rectangle maxScreensAway around the viewport
-    // if one of pt1 and pt2 is inside and the other outside, there
-    // will be only one intersection.
-    // if both are outside there will be 0 or 2 intersections
-    // (or 1 if it's right at a corner - we'll treat that like 0)
-    // returns an array of intersection pts
-    var xEdge0 = -xLen * maxScreensAway;
-    var xEdge1 = xLen * (1 + maxScreensAway);
-    var yEdge0 = -yLen * maxScreensAway;
-    var yEdge1 = yLen * (1 + maxScreensAway);
-    var edges = [
-        [xEdge0, yEdge0, xEdge1, yEdge0],
-        [xEdge1, yEdge0, xEdge1, yEdge1],
-        [xEdge1, yEdge1, xEdge0, yEdge1],
-        [xEdge0, yEdge1, xEdge0, yEdge0]
-    ];
-    var xEdge, yEdge, lastXEdge, lastYEdge, lastFarPt, edgePt;
-
-    // for linear line shape, edge intersections should be linearly interpolated
-    // spline uses this too, which isn't precisely correct but is actually pretty
-    // good, because Catmull-Rom weights far-away points less in creating the curvature
-    function getLinearEdgeIntersections(pt1, pt2) {
-        var out = [];
-        var ptCount = 0;
-        for(var i = 0; i < 4; i++) {
-            var edge = edges[i];
-            var ptInt = segmentsIntersect(
-                pt1[0], pt1[1], pt2[0], pt2[1],
-                edge[0], edge[1], edge[2], edge[3]
-            );
-            if(ptInt && (!ptCount ||
-                Math.abs(ptInt.x - out[0][0]) > 1 ||
-                Math.abs(ptInt.y - out[0][1]) > 1
-            )) {
-                ptInt = [ptInt.x, ptInt.y];
-                // if we have 2 intersections, make sure the closest one to pt1 comes first
-                if(ptCount && ptDist(ptInt, pt1) < ptDist(out[0], pt1)) out.unshift(ptInt);
-                else out.push(ptInt);
-                ptCount++;
-            }
-        }
-        return out;
-    }
-
-    function onlyConstrainedPoint(pt) {
-        if(pt[0] < xEdge0 || pt[0] > xEdge1 || pt[1] < yEdge0 || pt[1] > yEdge1) {
-            return [constrain(pt[0], xEdge0, xEdge1), constrain(pt[1], yEdge0, yEdge1)];
-        }
-    }
-
-    function sameEdge(pt1, pt2) {
-        if(pt1[0] === pt2[0] && (pt1[0] === xEdge0 || pt1[0] === xEdge1)) return true;
-        if(pt1[1] === pt2[1] && (pt1[1] === yEdge0 || pt1[1] === yEdge1)) return true;
-    }
-
-    // for line shapes hv and vh, movement in the two dimensions is decoupled,
-    // so all we need to do is constrain each dimension independently
-    function getHVEdgeIntersections(pt1, pt2) {
-        var out = [];
-        var ptInt1 = onlyConstrainedPoint(pt1);
-        var ptInt2 = onlyConstrainedPoint(pt2);
-        if(ptInt1 && ptInt2 && sameEdge(ptInt1, ptInt2)) return out;
-
-        if(ptInt1) out.push(ptInt1);
-        if(ptInt2) out.push(ptInt2);
-        return out;
-    }
-
-    // hvh and vhv we sometimes have to move one of the intersection points
-    // out BEYOND the clipping rect, by a maximum of a factor of 2, so that
-    // the midpoint line is drawn in the right place
-    function getABAEdgeIntersections(dim, limit0, limit1) {
-        return function(pt1, pt2) {
-            var ptInt1 = onlyConstrainedPoint(pt1);
-            var ptInt2 = onlyConstrainedPoint(pt2);
-
-            var out = [];
-            if(ptInt1 && ptInt2 && sameEdge(ptInt1, ptInt2)) return out;
-
-            if(ptInt1) out.push(ptInt1);
-            if(ptInt2) out.push(ptInt2);
-
-            var midShift = 2 * Lib.constrain((pt1[dim] + pt2[dim]) / 2, limit0, limit1) -
-                ((ptInt1 || pt1)[dim] + (ptInt2 || pt2)[dim]);
-            if(midShift) {
-                var ptToAlter;
-                if(ptInt1 && ptInt2) {
-                    ptToAlter = (midShift > 0 === ptInt1[dim] > ptInt2[dim]) ? ptInt1 : ptInt2;
-                } else ptToAlter = ptInt1 || ptInt2;
-
-                ptToAlter[dim] += midShift;
-            }
-
-            return out;
-        };
-    }
-
-    var getEdgeIntersections;
-    if(shape === 'linear' || shape === 'spline') {
-        getEdgeIntersections = getLinearEdgeIntersections;
-    } else if(shape === 'hv' || shape === 'vh') {
-        getEdgeIntersections = getHVEdgeIntersections;
-    } else if(shape === 'hvh') getEdgeIntersections = getABAEdgeIntersections(0, xEdge0, xEdge1);
-    else if(shape === 'vhv') getEdgeIntersections = getABAEdgeIntersections(1, yEdge0, yEdge1);
-
-    // a segment pt1->pt2 entirely outside the nearby region:
-    // find the corner it gets closest to touching
-    function getClosestCorner(pt1, pt2) {
-        var dx = pt2[0] - pt1[0];
-        var m = (pt2[1] - pt1[1]) / dx;
-        var b = (pt1[1] * pt2[0] - pt2[1] * pt1[0]) / dx;
-
-        if(b > 0) return [m > 0 ? xEdge0 : xEdge1, yEdge1];
-        else return [m > 0 ? xEdge1 : xEdge0, yEdge0];
-    }
-
-    function updateEdge(pt) {
-        var x = pt[0];
-        var y = pt[1];
-        var xSame = x === pts[pti - 1][0];
-        var ySame = y === pts[pti - 1][1];
-        // duplicate point?
-        if(xSame && ySame) return;
-        if(pti > 1) {
-            // backtracking along an edge?
-            var xSame2 = x === pts[pti - 2][0];
-            var ySame2 = y === pts[pti - 2][1];
-            if(xSame && (x === xEdge0 || x === xEdge1) && xSame2) {
-                if(ySame2) pti--; // backtracking exactly - drop prev pt and don't add
-                else pts[pti - 1] = pt; // not exact: replace the prev pt
-            } else if(ySame && (y === yEdge0 || y === yEdge1) && ySame2) {
-                if(xSame2) pti--;
-                else pts[pti - 1] = pt;
-            } else pts[pti++] = pt;
-        } else pts[pti++] = pt;
-    }
-
-    function updateEdgesForReentry(pt) {
-        // if we're outside the nearby region and going back in,
-        // we may need to loop around a corner point
-        if(pts[pti - 1][0] !== pt[0] && pts[pti - 1][1] !== pt[1]) {
-            updateEdge([lastXEdge, lastYEdge]);
-        }
-        updateEdge(pt);
-        lastFarPt = null;
-        lastXEdge = lastYEdge = 0;
-    }
-
-    function addPt(pt) {
-        latestXFrac = pt[0] / xLen;
-        latestYFrac = pt[1] / yLen;
-        // Are we more than maxScreensAway off-screen any direction?
-        // if so, clip to this box, but in such a way that on-screen
-        // drawing is unchanged
-        xEdge = (pt[0] < xEdge0) ? xEdge0 : (pt[0] > xEdge1) ? xEdge1 : 0;
-        yEdge = (pt[1] < yEdge0) ? yEdge0 : (pt[1] > yEdge1) ? yEdge1 : 0;
-        if(xEdge || yEdge) {
-            if(!pti) {
-                // to get fills right - if first point is far, push it toward the
-                // screen in whichever direction(s) are far
-
-                pts[pti++] = [xEdge || pt[0], yEdge || pt[1]];
-            } else if(lastFarPt) {
-                // both this point and the last are outside the nearby region
-                // check if we're crossing the nearby region
-                var intersections = getEdgeIntersections(lastFarPt, pt);
-                if(intersections.length > 1) {
-                    updateEdgesForReentry(intersections[0]);
-                    pts[pti++] = intersections[1];
-                }
-            } else {
-                // we're leaving the nearby region - add the point where we left it
-
-                edgePt = getEdgeIntersections(pts[pti - 1], pt)[0];
-                pts[pti++] = edgePt;
-            }
-
-            var lastPt = pts[pti - 1];
-            if(xEdge && yEdge && (lastPt[0] !== xEdge || lastPt[1] !== yEdge)) {
-                // we've gone out beyond a new corner: add the corner too
-                // so that the next point will take the right winding
-                if(lastFarPt) {
-                    if(lastXEdge !== xEdge && lastYEdge !== yEdge) {
-                        if(lastXEdge && lastYEdge) {
-                            // we've gone around to an opposite corner - we
-                            // need to add the correct extra corner
-                            // in order to get the right winding
-                            updateEdge(getClosestCorner(lastFarPt, pt));
-                        } else {
-                            // we're coming from a far edge - the extra corner
-                            // we need is determined uniquely by the sectors
-                            updateEdge([lastXEdge || xEdge, lastYEdge || yEdge]);
-                        }
-                    } else if(lastXEdge && lastYEdge) {
-                        updateEdge([lastXEdge, lastYEdge]);
-                    }
-                }
-                updateEdge([xEdge, yEdge]);
-            } else if((lastXEdge - xEdge) && (lastYEdge - yEdge)) {
-                // we're coming from an edge or far corner to an edge - again the
-                // extra corner we need is uniquely determined by the sectors
-                updateEdge([xEdge || lastXEdge, yEdge || lastYEdge]);
-            }
-            lastFarPt = pt;
-            lastXEdge = xEdge;
-            lastYEdge = yEdge;
-        } else {
-            if(lastFarPt) {
-                // this point is in range but the previous wasn't: add its entry pt first
-                updateEdgesForReentry(getEdgeIntersections(lastFarPt, pt)[0]);
-            }
-
-            pts[pti++] = pt;
-        }
-    }
-
-    // loop over ALL points in this trace
-    for(i = 0; i < len; i++) {
-        clusterStartPt = getPt(i);
-        if(!clusterStartPt) continue;
-
-        pti = 0;
-        lastFarPt = null;
-        addPt(clusterStartPt);
-
-        // loop over one segment of the trace
-        for(i++; i < len; i++) {
-            clusterHighPt = getPt(i);
-            if(!clusterHighPt) {
-                if(connectGaps) continue;
-                else break;
-            }
-
-            // can't decimate if nonlinear line shape
-            // TODO: we *could* decimate [hv]{2,3} shapes if we restricted clusters to horz or vert again
-            // but spline would be verrry awkward to decimate
-            if(!linear || !opts.simplify) {
-                addPt(clusterHighPt);
-                continue;
-            }
-
-            var nextPt = getPt(i + 1);
-
-            clusterRefDist = ptDist(clusterHighPt, clusterStartPt);
-
-            // #3147 - always include the very first and last points for fills
-            if(!(fill && (pti === 0 || pti === len - 1)) &&
-                clusterRefDist < getTolerance(clusterHighPt, nextPt) * minTolerance) continue;
-
-            clusterUnitVector = [
-                (clusterHighPt[0] - clusterStartPt[0]) / clusterRefDist,
-                (clusterHighPt[1] - clusterStartPt[1]) / clusterRefDist
-            ];
-
-            clusterLowPt = clusterStartPt;
-            clusterHighVal = clusterRefDist;
-            clusterLowVal = clusterMinDeviation = clusterMaxDeviation = 0;
-            clusterHighFirst = false;
-            clusterEndPt = clusterHighPt;
-
-            // loop over one cluster of points that collapse onto one line
-            for(i++; i < d.length; i++) {
-                thisPt = nextPt;
-                nextPt = getPt(i + 1);
-                if(!thisPt) {
-                    if(connectGaps) continue;
-                    else break;
-                }
-                thisVector = [
-                    thisPt[0] - clusterStartPt[0],
-                    thisPt[1] - clusterStartPt[1]
-                ];
-                // cross product (or dot with normal to the cluster vector)
-                thisDeviation = thisVector[0] * clusterUnitVector[1] - thisVector[1] * clusterUnitVector[0];
-                clusterMinDeviation = Math.min(clusterMinDeviation, thisDeviation);
-                clusterMaxDeviation = Math.max(clusterMaxDeviation, thisDeviation);
-
-                if(clusterMaxDeviation - clusterMinDeviation > getTolerance(thisPt, nextPt)) break;
-
-                clusterEndPt = thisPt;
-                thisVal = thisVector[0] * clusterUnitVector[0] + thisVector[1] * clusterUnitVector[1];
-
-                if(thisVal > clusterHighVal) {
-                    clusterHighVal = thisVal;
-                    clusterHighPt = thisPt;
-                    clusterHighFirst = false;
-                } else if(thisVal < clusterLowVal) {
-                    clusterLowVal = thisVal;
-                    clusterLowPt = thisPt;
-                    clusterHighFirst = true;
-                }
-            }
-
-            // insert this cluster into pts
-            // we've already inserted the start pt, now check if we have high and low pts
-            if(clusterHighFirst) {
-                addPt(clusterHighPt);
-                if(clusterEndPt !== clusterLowPt) addPt(clusterLowPt);
-            } else {
-                if(clusterLowPt !== clusterStartPt) addPt(clusterLowPt);
-                if(clusterEndPt !== clusterHighPt) addPt(clusterHighPt);
-            }
-            // and finally insert the end pt
-            addPt(clusterEndPt);
-
-            // have we reached the end of this segment?
-            if(i >= d.length || !thisPt) break;
-
-            // otherwise we have an out-of-cluster point to insert as next clusterStartPt
-            addPt(thisPt);
-            clusterStartPt = thisPt;
-        }
-
-        // to get fills right - repeat what we did at the start
-        if(lastFarPt) updateEdge([lastXEdge || lastFarPt[0], lastYEdge || lastFarPt[1]]);
-
-        segments.push(pts.slice(0, pti));
-    }
-
-    return segments;
-};
-
-},{"../../constants/numerical":485,"../../lib":506,"./constants":639}],650:[function(_dereq_,module,exports){
-/**
-* Copyright 2012-2020, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-
-'use strict';
-
-
-// common to 'scatter' and 'scatterternary'
-module.exports = function handleLineShapeDefaults(traceIn, traceOut, coerce) {
-    var shape = coerce('line.shape');
-    if(shape === 'spline') coerce('line.smoothing');
-};
-
-},{}],651:[function(_dereq_,module,exports){
-/**
-* Copyright 2012-2020, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-'use strict';
-
-var LINKEDFILLS = {tonextx: 1, tonexty: 1, tonext: 1};
-
-module.exports = function linkTraces(gd, plotinfo, cdscatter) {
-    var trace, i, group, prevtrace, groupIndex;
-
-    // first sort traces to keep stacks & filled-together groups together
-    var groupIndices = {};
-    var needsSort = false;
-    var prevGroupIndex = -1;
-    var nextGroupIndex = 0;
-    var prevUnstackedGroupIndex = -1;
-    for(i = 0; i < cdscatter.length; i++) {
-        trace = cdscatter[i][0].trace;
-        group = trace.stackgroup || '';
-        if(group) {
-            if(group in groupIndices) {
-                groupIndex = groupIndices[group];
-            } else {
-                groupIndex = groupIndices[group] = nextGroupIndex;
-                nextGroupIndex++;
-            }
-        } else if(trace.fill in LINKEDFILLS && prevUnstackedGroupIndex >= 0) {
-            groupIndex = prevUnstackedGroupIndex;
-        } else {
-            groupIndex = prevUnstackedGroupIndex = nextGroupIndex;
-            nextGroupIndex++;
-        }
-
-        if(groupIndex < prevGroupIndex) needsSort = true;
-        trace._groupIndex = prevGroupIndex = groupIndex;
-    }
-
-    var cdscatterSorted = cdscatter.slice();
-    if(needsSort) {
-        cdscatterSorted.sort(function(a, b) {
-            var traceA = a[0].trace;
-            var traceB = b[0].trace;
-            return (traceA._groupIndex - traceB._groupIndex) ||
-                (traceA.index - traceB.index);
-        });
-    }
-
-    // now link traces to each other
-    var prevtraces = {};
-    for(i = 0; i < cdscatterSorted.length; i++) {
-        trace = cdscatterSorted[i][0].trace;
-        group = trace.stackgroup || '';
-
-        // Note: The check which ensures all cdscatter here are for the same axis and
-        // are either cartesian or scatterternary has been removed. This code assumes
-        // the passed scattertraces have been filtered to the proper plot types and
-        // the proper subplots.
-        if(trace.visible === true) {
-            trace._nexttrace = null;
-
-            if(trace.fill in LINKEDFILLS) {
-                prevtrace = prevtraces[group];
-                trace._prevtrace = prevtrace || null;
-
-                if(prevtrace) {
-                    prevtrace._nexttrace = trace;
-                }
-            }
-
-            trace._ownfill = (trace.fill && (
-                trace.fill.substr(0, 6) === 'tozero' ||
-                trace.fill === 'toself' ||
-                (trace.fill.substr(0, 2) === 'to' && !trace._prevtrace)
-            ));
-
-            prevtraces[group] = trace;
-        } else {
-            trace._prevtrace = trace._nexttrace = trace._ownfill = null;
-        }
-    }
-
-    return cdscatterSorted;
-};
-
-},{}],652:[function(_dereq_,module,exports){
-/**
-* Copyright 2012-2020, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-
-'use strict';
-
-var isNumeric = _dereq_('fast-isnumeric');
-
-
-// used in the drawing step for 'scatter' and 'scattegeo' and
-// in the convert step for 'scatter3d'
-module.exports = function makeBubbleSizeFn(trace) {
-    var marker = trace.marker;
-    var sizeRef = marker.sizeref || 1;
-    var sizeMin = marker.sizemin || 0;
-
-    // for bubble charts, allow scaling the provided value linearly
-    // and by area or diameter.
-    // Note this only applies to the array-value sizes
-
-    var baseFn = (marker.sizemode === 'area') ?
-        function(v) { return Math.sqrt(v / sizeRef); } :
-        function(v) { return v / sizeRef; };
-
-    // TODO add support for position/negative bubbles?
-    // TODO add 'sizeoffset' attribute?
-    return function(v) {
-        var baseSize = baseFn(v / 2);
-
-        // don't show non-numeric and negative sizes
-        return (isNumeric(baseSize) && (baseSize > 0)) ?
-            Math.max(baseSize, sizeMin) :
-            0;
-    };
-};
-
-},{"fast-isnumeric":90}],653:[function(_dereq_,module,exports){
-/**
-* Copyright 2012-2020, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-
-'use strict';
-
-module.exports = {
-    container: 'marker',
-    min: 'cmin',
-    max: 'cmax'
-};
-
-},{}],654:[function(_dereq_,module,exports){
-/**
-* Copyright 2012-2020, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-'use strict';
-
-var Color = _dereq_('../../components/color');
-var hasColorscale = _dereq_('../../components/colorscale/helpers').hasColorscale;
-var colorscaleDefaults = _dereq_('../../components/colorscale/defaults');
-
-var subTypes = _dereq_('./subtypes');
-
-/*
- * opts: object of flags to control features not all marker users support
- *   noLine: caller does not support marker lines
- *   gradient: caller supports gradients
- *   noSelect: caller does not support selected/unselected attribute containers
- */
-module.exports = function markerDefaults(traceIn, traceOut, defaultColor, layout, coerce, opts) {
-    var isBubble = subTypes.isBubble(traceIn);
-    var lineColor = (traceIn.line || {}).color;
-    var defaultMLC;
-
-    opts = opts || {};
-
-    // marker.color inherit from line.color (even if line.color is an array)
-    if(lineColor) defaultColor = lineColor;
-
-    coerce('marker.symbol');
-    coerce('marker.opacity', isBubble ? 0.7 : 1);
-    coerce('marker.size');
-
-    coerce('marker.color', defaultColor);
-    if(hasColorscale(traceIn, 'marker')) {
-        colorscaleDefaults(traceIn, traceOut, layout, coerce, {prefix: 'marker.', cLetter: 'c'});
-    }
-
-    if(!opts.noSelect) {
-        coerce('selected.marker.color');
-        coerce('unselected.marker.color');
-        coerce('selected.marker.size');
-        coerce('unselected.marker.size');
-    }
-
-    if(!opts.noLine) {
-        // if there's a line with a different color than the marker, use
-        // that line color as the default marker line color
-        // (except when it's an array)
-        // mostly this is for transparent markers to behave nicely
-        if(lineColor && !Array.isArray(lineColor) && (traceOut.marker.color !== lineColor)) {
-            defaultMLC = lineColor;
-        } else if(isBubble) defaultMLC = Color.background;
-        else defaultMLC = Color.defaultLine;
-
-        coerce('marker.line.color', defaultMLC);
-        if(hasColorscale(traceIn, 'marker.line')) {
-            colorscaleDefaults(traceIn, traceOut, layout, coerce, {prefix: 'marker.line.', cLetter: 'c'});
-        }
-
-        coerce('marker.line.width', isBubble ? 1 : 0);
-    }
-
-    if(isBubble) {
-        coerce('marker.sizeref');
-        coerce('marker.sizemin');
-        coerce('marker.sizemode');
-    }
-
-    if(opts.gradient) {
-        var gradientType = coerce('marker.gradient.type');
-        if(gradientType !== 'none') {
-            coerce('marker.gradient.color');
-        }
-    }
-};
-
-},{"../../components/color":378,"../../components/colorscale/defaults":388,"../../components/colorscale/helpers":389,"./subtypes":659}],655:[function(_dereq_,module,exports){
-/**
-* Copyright 2012-2020, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-
-'use strict';
-
-var d3 = _dereq_('d3');
-
-var Registry = _dereq_('../../registry');
-var Lib = _dereq_('../../lib');
-var ensureSingle = Lib.ensureSingle;
-var identity = Lib.identity;
-var Drawing = _dereq_('../../components/drawing');
-
-var subTypes = _dereq_('./subtypes');
-var linePoints = _dereq_('./line_points');
-var linkTraces = _dereq_('./link_traces');
-var polygonTester = _dereq_('../../lib/polygon').tester;
-
-module.exports = function plot(gd, plotinfo, cdscatter, scatterLayer, transitionOpts, makeOnCompleteCallback) {
-    var join, onComplete;
-
-    // If transition config is provided, then it is only a partial replot and traces not
-    // updated are removed.
-    var isFullReplot = !transitionOpts;
-    var hasTransition = !!transitionOpts && transitionOpts.duration > 0;
-
-    // Link traces so the z-order of fill layers is correct
-    var cdscatterSorted = linkTraces(gd, plotinfo, cdscatter);
-
-    join = scatterLayer.selectAll('g.trace')
-        .data(cdscatterSorted, function(d) { return d[0].trace.uid; });
-
-    // Append new traces:
-    join.enter().append('g')
-        .attr('class', function(d) {
-            return 'trace scatter trace' + d[0].trace.uid;
-        })
-        .style('stroke-miterlimit', 2);
-    join.order();
-
-    createFills(gd, join, plotinfo);
-
-    if(hasTransition) {
-        if(makeOnCompleteCallback) {
-            // If it was passed a callback to register completion, make a callback. If
-            // this is created, then it must be executed on completion, otherwise the
-            // pos-transition redraw will not execute:
-            onComplete = makeOnCompleteCallback();
-        }
-
-        var transition = d3.transition()
-            .duration(transitionOpts.duration)
-            .ease(transitionOpts.easing)
-            .each('end', function() {
-                onComplete && onComplete();
-            })
-            .each('interrupt', function() {
-                onComplete && onComplete();
-            });
-
-        transition.each(function() {
-            // Must run the selection again since otherwise enters/updates get grouped together
-            // and these get executed out of order. Except we need them in order!
-            scatterLayer.selectAll('g.trace').each(function(d, i) {
-                plotOne(gd, i, plotinfo, d, cdscatterSorted, this, transitionOpts);
-            });
-        });
-    } else {
-        join.each(function(d, i) {
-            plotOne(gd, i, plotinfo, d, cdscatterSorted, this, transitionOpts);
-        });
-    }
-
-    if(isFullReplot) {
-        join.exit().remove();
-    }
-
-    // remove paths that didn't get used
-    scatterLayer.selectAll('path:not([d])').remove();
-};
-
-function createFills(gd, traceJoin, plotinfo) {
-    traceJoin.each(function(d) {
-        var fills = ensureSingle(d3.select(this), 'g', 'fills');
-        Drawing.setClipUrl(fills, plotinfo.layerClipId, gd);
-
-        var trace = d[0].trace;
-
-        var fillData = [];
-        if(trace._ownfill) fillData.push('_ownFill');
-        if(trace._nexttrace) fillData.push('_nextFill');
-
-        var fillJoin = fills.selectAll('g').data(fillData, identity);
-
-        fillJoin.enter().append('g');
-
-        fillJoin.exit()
-            .each(function(d) { trace[d] = null; })
-            .remove();
-
-        fillJoin.order().each(function(d) {
-            // make a path element inside the fill group, just so
-            // we can give it its own data later on and the group can
-            // keep its simple '_*Fill' data
-            trace[d] = ensureSingle(d3.select(this), 'path', 'js-fill');
-        });
-    });
-}
-
-function plotOne(gd, idx, plotinfo, cdscatter, cdscatterAll, element, transitionOpts) {
-    var i;
-
-    // Since this has been reorganized and we're executing this on individual traces,
-    // we need to pass it the full list of cdscatter as well as this trace's index (idx)
-    // since it does an internal n^2 loop over comparisons with other traces:
-    selectMarkers(gd, idx, plotinfo, cdscatter, cdscatterAll);
-
-    var hasTransition = !!transitionOpts && transitionOpts.duration > 0;
-
-    function transition(selection) {
-        return hasTransition ? selection.transition() : selection;
-    }
-
-    var xa = plotinfo.xaxis;
-    var ya = plotinfo.yaxis;
-
-    var trace = cdscatter[0].trace;
-    var line = trace.line;
-    var tr = d3.select(element);
-
-    var errorBarGroup = ensureSingle(tr, 'g', 'errorbars');
-    var lines = ensureSingle(tr, 'g', 'lines');
-    var points = ensureSingle(tr, 'g', 'points');
-    var text = ensureSingle(tr, 'g', 'text');
-
-    // error bars are at the bottom
-    Registry.getComponentMethod('errorbars', 'plot')(gd, errorBarGroup, plotinfo, transitionOpts);
-
-    if(trace.visible !== true) return;
-
-    transition(tr).style('opacity', trace.opacity);
-
-    // BUILD LINES AND FILLS
-    var ownFillEl3, tonext;
-    var ownFillDir = trace.fill.charAt(trace.fill.length - 1);
-    if(ownFillDir !== 'x' && ownFillDir !== 'y') ownFillDir = '';
-
-    // store node for tweaking by selectPoints
-    cdscatter[0][plotinfo.isRangePlot ? 'nodeRangePlot3' : 'node3'] = tr;
-
-    var prevRevpath = '';
-    var prevPolygons = [];
-    var prevtrace = trace._prevtrace;
-
-    if(prevtrace) {
-        prevRevpath = prevtrace._prevRevpath || '';
-        tonext = prevtrace._nextFill;
-        prevPolygons = prevtrace._polygons;
-    }
-
-    var thispath;
-    var thisrevpath;
-    // fullpath is all paths for this curve, joined together straight
-    // across gaps, for filling
-    var fullpath = '';
-    // revpath is fullpath reversed, for fill-to-next
-    var revpath = '';
-    // functions for converting a point array to a path
-    var pathfn, revpathbase, revpathfn;
-    // variables used before and after the data join
-    var pt0, lastSegment, pt1, thisPolygons;
-
-    // initialize line join data / method
-    var segments = [];
-    var makeUpdate = Lib.noop;
-
-    ownFillEl3 = trace._ownFill;
-
-    if(subTypes.hasLines(trace) || trace.fill !== 'none') {
-        if(tonext) {
-            // This tells .style which trace to use for fill information:
-            tonext.datum(cdscatter);
-        }
-
-        if(['hv', 'vh', 'hvh', 'vhv'].indexOf(line.shape) !== -1) {
-            pathfn = Drawing.steps(line.shape);
-            revpathbase = Drawing.steps(
-                line.shape.split('').reverse().join('')
-            );
-        } else if(line.shape === 'spline') {
-            pathfn = revpathbase = function(pts) {
-                var pLast = pts[pts.length - 1];
-                if(pts.length > 1 && pts[0][0] === pLast[0] && pts[0][1] === pLast[1]) {
-                    // identical start and end points: treat it as a
-                    // closed curve so we don't get a kink
-                    return Drawing.smoothclosed(pts.slice(1), line.smoothing);
-                } else {
-                    return Drawing.smoothopen(pts, line.smoothing);
-                }
-            };
-        } else {
-            pathfn = revpathbase = function(pts) {
-                return 'M' + pts.join('L');
-            };
-        }
-
-        revpathfn = function(pts) {
-            // note: this is destructive (reverses pts in place) so can't use pts after this
-            return revpathbase(pts.reverse());
-        };
-
-        segments = linePoints(cdscatter, {
-            xaxis: xa,
-            yaxis: ya,
-            connectGaps: trace.connectgaps,
-            baseTolerance: Math.max(line.width || 1, 3) / 4,
-            shape: line.shape,
-            simplify: line.simplify,
-            fill: trace.fill
-        });
-
-        // since we already have the pixel segments here, use them to make
-        // polygons for hover on fill
-        // TODO: can we skip this if hoveron!=fills? That would mean we
-        // need to redraw when you change hoveron...
-        thisPolygons = trace._polygons = new Array(segments.length);
-        for(i = 0; i < segments.length; i++) {
-            trace._polygons[i] = polygonTester(segments[i]);
-        }
-
-        if(segments.length) {
-            pt0 = segments[0][0];
-            lastSegment = segments[segments.length - 1];
-            pt1 = lastSegment[lastSegment.length - 1];
-        }
-
-        makeUpdate = function(isEnter) {
-            return function(pts) {
-                thispath = pathfn(pts);
-                thisrevpath = revpathfn(pts);
-                if(!fullpath) {
-                    fullpath = thispath;
-                    revpath = thisrevpath;
-                } else if(ownFillDir) {
-                    fullpath += 'L' + thispath.substr(1);
-                    revpath = thisrevpath + ('L' + revpath.substr(1));
-                } else {
-                    fullpath += 'Z' + thispath;
-                    revpath = thisrevpath + 'Z' + revpath;
-                }
-
-                if(subTypes.hasLines(trace) && pts.length > 1) {
-                    var el = d3.select(this);
-
-                    // This makes the coloring work correctly:
-                    el.datum(cdscatter);
-
-                    if(isEnter) {
-                        transition(el.style('opacity', 0)
-                            .attr('d', thispath)
-                            .call(Drawing.lineGroupStyle))
-                                .style('opacity', 1);
-                    } else {
-                        var sel = transition(el);
-                        sel.attr('d', thispath);
-                        Drawing.singleLineStyle(cdscatter, sel);
-                    }
-                }
-            };
-        };
-    }
-
-    var lineJoin = lines.selectAll('.js-line').data(segments);
-
-    transition(lineJoin.exit())
-        .style('opacity', 0)
-        .remove();
-
-    lineJoin.each(makeUpdate(false));
-
-    lineJoin.enter().append('path')
-        .classed('js-line', true)
-        .style('vector-effect', 'non-scaling-stroke')
-        .call(Drawing.lineGroupStyle)
-        .each(makeUpdate(true));
-
-    Drawing.setClipUrl(lineJoin, plotinfo.layerClipId, gd);
-
-    function clearFill(selection) {
-        transition(selection).attr('d', 'M0,0Z');
-    }
-
-    if(segments.length) {
-        if(ownFillEl3) {
-            ownFillEl3.datum(cdscatter);
-            if(pt0 && pt1) {
-                if(ownFillDir) {
-                    if(ownFillDir === 'y') {
-                        pt0[1] = pt1[1] = ya.c2p(0, true);
-                    } else if(ownFillDir === 'x') {
-                        pt0[0] = pt1[0] = xa.c2p(0, true);
-                    }
-
-                    // fill to zero: full trace path, plus extension of
-                    // the endpoints to the appropriate axis
-                    // For the sake of animations, wrap the points around so that
-                    // the points on the axes are the first two points. Otherwise
-                    // animations get a little crazy if the number of points changes.
-                    transition(ownFillEl3).attr('d', 'M' + pt1 + 'L' + pt0 + 'L' + fullpath.substr(1))
-                        .call(Drawing.singleFillStyle);
-                } else {
-                    // fill to self: just join the path to itself
-                    transition(ownFillEl3).attr('d', fullpath + 'Z')
-                        .call(Drawing.singleFillStyle);
-                }
-            }
-        } else if(tonext) {
-            if(trace.fill.substr(0, 6) === 'tonext' && fullpath && prevRevpath) {
-                // fill to next: full trace path, plus the previous path reversed
-                if(trace.fill === 'tonext') {
-                    // tonext: for use by concentric shapes, like manually constructed
-                    // contours, we just add the two paths closed on themselves.
-                    // This makes strange results if one path is *not* entirely
-                    // inside the other, but then that is a strange usage.
-                    transition(tonext).attr('d', fullpath + 'Z' + prevRevpath + 'Z')
-                        .call(Drawing.singleFillStyle);
-                } else {
-                    // tonextx/y: for now just connect endpoints with lines. This is
-                    // the correct behavior if the endpoints are at the same value of
-                    // y/x, but if they *aren't*, we should ideally do more complicated
-                    // things depending on whether the new endpoint projects onto the
-                    // existing curve or off the end of it
-                    transition(tonext).attr('d', fullpath + 'L' + prevRevpath.substr(1) + 'Z')
-                        .call(Drawing.singleFillStyle);
-                }
-                trace._polygons = trace._polygons.concat(prevPolygons);
-            } else {
-                clearFill(tonext);
-                trace._polygons = null;
-            }
-        }
-        trace._prevRevpath = revpath;
-        trace._prevPolygons = thisPolygons;
-    } else {
-        if(ownFillEl3) clearFill(ownFillEl3);
-        else if(tonext) clearFill(tonext);
-        trace._polygons = trace._prevRevpath = trace._prevPolygons = null;
-    }
-
-
-    function visFilter(d) {
-        return d.filter(function(v) { return !v.gap && v.vis; });
-    }
-
-    function visFilterWithGaps(d) {
-        return d.filter(function(v) { return v.vis; });
-    }
-
-    function gapFilter(d) {
-        return d.filter(function(v) { return !v.gap; });
-    }
-
-    function keyFunc(d) {
-        return d.id;
-    }
-
-    // Returns a function if the trace is keyed, otherwise returns undefined
-    function getKeyFunc(trace) {
-        if(trace.ids) {
-            return keyFunc;
-        }
-    }
-
-    function hideFilter() {
-        return false;
-    }
-
-    function makePoints(points, text, cdscatter) {
-        var join, selection, hasNode;
-
-        var trace = cdscatter[0].trace;
-        var showMarkers = subTypes.hasMarkers(trace);
-        var showText = subTypes.hasText(trace);
-
-        var keyFunc = getKeyFunc(trace);
-        var markerFilter = hideFilter;
-        var textFilter = hideFilter;
-
-        if(showMarkers || showText) {
-            var showFilter = identity;
-            // if we're stacking, "infer zero" gap mode gets markers in the
-            // gap points - because we've inferred a zero there - but other
-            // modes (currently "interpolate", later "interrupt" hopefully)
-            // we don't draw generated markers
-            var stackGroup = trace.stackgroup;
-            var isInferZero = stackGroup && (
-                gd._fullLayout._scatterStackOpts[xa._id + ya._id][stackGroup].stackgaps === 'infer zero');
-            if(trace.marker.maxdisplayed || trace._needsCull) {
-                showFilter = isInferZero ? visFilterWithGaps : visFilter;
-            } else if(stackGroup && !isInferZero) {
-                showFilter = gapFilter;
-            }
-
-            if(showMarkers) markerFilter = showFilter;
-            if(showText) textFilter = showFilter;
-        }
-
-        // marker points
-
-        selection = points.selectAll('path.point');
-
-        join = selection.data(markerFilter, keyFunc);
-
-        var enter = join.enter().append('path')
-            .classed('point', true);
-
-        if(hasTransition) {
-            enter
-                .call(Drawing.pointStyle, trace, gd)
-                .call(Drawing.translatePoints, xa, ya)
-                .style('opacity', 0)
-                .transition()
-                .style('opacity', 1);
-        }
-
-        join.order();
-
-        var styleFns;
-        if(showMarkers) {
-            styleFns = Drawing.makePointStyleFns(trace);
-        }
-
-        join.each(function(d) {
-            var el = d3.select(this);
-            var sel = transition(el);
-            hasNode = Drawing.translatePoint(d, sel, xa, ya);
-
-            if(hasNode) {
-                Drawing.singlePointStyle(d, sel, trace, styleFns, gd);
-
-                if(plotinfo.layerClipId) {
-                    Drawing.hideOutsideRangePoint(d, sel, xa, ya, trace.xcalendar, trace.ycalendar);
-                }
-
-                if(trace.customdata) {
-                    el.classed('plotly-customdata', d.data !== null && d.data !== undefined);
-                }
-            } else {
-                sel.remove();
-            }
-        });
-
-        if(hasTransition) {
-            join.exit().transition()
-                .style('opacity', 0)
-                .remove();
-        } else {
-            join.exit().remove();
-        }
-
-        // text points
-        selection = text.selectAll('g');
-        join = selection.data(textFilter, keyFunc);
-
-        // each text needs to go in its own 'g' in case
-        // it gets converted to mathjax
-        join.enter().append('g').classed('textpoint', true).append('text');
-
-        join.order();
-
-        join.each(function(d) {
-            var g = d3.select(this);
-            var sel = transition(g.select('text'));
-            hasNode = Drawing.translatePoint(d, sel, xa, ya);
-
-            if(hasNode) {
-                if(plotinfo.layerClipId) {
-                    Drawing.hideOutsideRangePoint(d, g, xa, ya, trace.xcalendar, trace.ycalendar);
-                }
-            } else {
-                g.remove();
-            }
-        });
-
-        join.selectAll('text')
-            .call(Drawing.textPointStyle, trace, gd)
-            .each(function(d) {
-                // This just *has* to be totally custom becuase of SVG text positioning :(
-                // It's obviously copied from translatePoint; we just can't use that
-                var x = xa.c2p(d.x);
-                var y = ya.c2p(d.y);
-
-                d3.select(this).selectAll('tspan.line').each(function() {
-                    transition(d3.select(this)).attr({x: x, y: y});
-                });
-            });
-
-        join.exit().remove();
-    }
-
-    points.datum(cdscatter);
-    text.datum(cdscatter);
-    makePoints(points, text, cdscatter);
-
-    // lastly, clip points groups of `cliponaxis !== false` traces
-    // on `plotinfo._hasClipOnAxisFalse === true` subplots
-    var hasClipOnAxisFalse = trace.cliponaxis === false;
-    var clipUrl = hasClipOnAxisFalse ? null : plotinfo.layerClipId;
-    Drawing.setClipUrl(points, clipUrl, gd);
-    Drawing.setClipUrl(text, clipUrl, gd);
-}
-
-function selectMarkers(gd, idx, plotinfo, cdscatter, cdscatterAll) {
-    var xa = plotinfo.xaxis;
-    var ya = plotinfo.yaxis;
-    var xr = d3.extent(Lib.simpleMap(xa.range, xa.r2c));
-    var yr = d3.extent(Lib.simpleMap(ya.range, ya.r2c));
-
-    var trace = cdscatter[0].trace;
-    if(!subTypes.hasMarkers(trace)) return;
-    // if marker.maxdisplayed is used, select a maximum of
-    // mnum markers to show, from the set that are in the viewport
-    var mnum = trace.marker.maxdisplayed;
-
-    // TODO: remove some as we get away from the viewport?
-    if(mnum === 0) return;
-
-    var cd = cdscatter.filter(function(v) {
-        return v.x >= xr[0] && v.x <= xr[1] && v.y >= yr[0] && v.y <= yr[1];
-    });
-    var inc = Math.ceil(cd.length / mnum);
-    var tnum = 0;
-    cdscatterAll.forEach(function(cdj, j) {
-        var tracei = cdj[0].trace;
-        if(subTypes.hasMarkers(tracei) &&
-                tracei.marker.maxdisplayed > 0 && j < idx) {
-            tnum++;
-        }
-    });
-
-    // if multiple traces use maxdisplayed, stagger which markers we
-    // display this formula offsets successive traces by 1/3 of the
-    // increment, adding an extra small amount after each triplet so
-    // it's not quite periodic
-    var i0 = Math.round(tnum * inc / 3 + Math.floor(tnum / 3) * inc / 7.1);
-
-    // for error bars: save in cd which markers to show
-    // so we don't have to repeat this
-    cdscatter.forEach(function(v) { delete v.vis; });
-    cd.forEach(function(v, i) {
-        if(Math.round((i + i0) % inc) === 0) v.vis = true;
-    });
-}
-
-},{"../../components/drawing":400,"../../lib":506,"../../lib/polygon":518,"../../registry":606,"./line_points":649,"./link_traces":651,"./subtypes":659,"d3":81}],656:[function(_dereq_,module,exports){
-/**
-* Copyright 2012-2020, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-
-'use strict';
-
-var subtypes = _dereq_('./subtypes');
-
-module.exports = function selectPoints(searchInfo, selectionTester) {
-    var cd = searchInfo.cd;
-    var xa = searchInfo.xaxis;
-    var ya = searchInfo.yaxis;
-    var selection = [];
-    var trace = cd[0].trace;
-    var i;
-    var di;
-    var x;
-    var y;
-
-    var hasOnlyLines = (!subtypes.hasMarkers(trace) && !subtypes.hasText(trace));
-    if(hasOnlyLines) return [];
-
-    if(selectionTester === false) { // clear selection
-        for(i = 0; i < cd.length; i++) {
-            cd[i].selected = 0;
-        }
-    } else {
-        for(i = 0; i < cd.length; i++) {
-            di = cd[i];
-            x = xa.c2p(di.x);
-            y = ya.c2p(di.y);
-
-            if((di.i !== null) && selectionTester.contains([x, y], false, i, searchInfo)) {
-                selection.push({
-                    pointNumber: di.i,
-                    x: xa.c2d(di.x),
-                    y: ya.c2d(di.y)
-                });
-                di.selected = 1;
-            } else {
-                di.selected = 0;
-            }
-        }
-    }
-
-    return selection;
-};
-
-},{"./subtypes":659}],657:[function(_dereq_,module,exports){
-/**
-* Copyright 2012-2020, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-'use strict';
-
-var perStackAttrs = ['orientation', 'groupnorm', 'stackgaps'];
-
-module.exports = function handleStackDefaults(traceIn, traceOut, layout, coerce) {
-    var stackOpts = layout._scatterStackOpts;
-
-    var stackGroup = coerce('stackgroup');
-    if(stackGroup) {
-        // use independent stacking options per subplot
-        var subplot = traceOut.xaxis + traceOut.yaxis;
-        var subplotStackOpts = stackOpts[subplot];
-        if(!subplotStackOpts) subplotStackOpts = stackOpts[subplot] = {};
-
-        var groupOpts = subplotStackOpts[stackGroup];
-        var firstTrace = false;
-        if(groupOpts) {
-            groupOpts.traces.push(traceOut);
-        } else {
-            groupOpts = subplotStackOpts[stackGroup] = {
-                // keep track of trace indices for use during stacking calculations
-                // this will be filled in during `calc` and used during `crossTraceCalc`
-                // so it's OK if we don't recreate it during a non-calc edit
-                traceIndices: [],
-                // Hold on to the whole set of prior traces
-                // First one is most important, so we can clear defaults
-                // there if we find explicit values only in later traces.
-                // We're only going to *use* the values stored in groupOpts,
-                // but for the editor and validate we want things self-consistent
-                // The full set of traces is used only to fix `fill` default if
-                // we find `orientation: 'h'` beyond the first trace
-                traces: [traceOut]
-            };
-            firstTrace = true;
-        }
-        // TODO: how is this going to work with groupby transforms?
-        // in principle it should be OK I guess, as long as explicit group styles
-        // don't override explicit base-trace styles?
-
-        var dflts = {
-            orientation: (traceOut.x && !traceOut.y) ? 'h' : 'v'
-        };
-
-        for(var i = 0; i < perStackAttrs.length; i++) {
-            var attr = perStackAttrs[i];
-            var attrFound = attr + 'Found';
-            if(!groupOpts[attrFound]) {
-                var traceHasAttr = traceIn[attr] !== undefined;
-                var isOrientation = attr === 'orientation';
-                if(traceHasAttr || firstTrace) {
-                    groupOpts[attr] = coerce(attr, dflts[attr]);
-
-                    if(isOrientation) {
-                        groupOpts.fillDflt = groupOpts[attr] === 'h' ?
-                            'tonextx' : 'tonexty';
-                    }
-
-                    if(traceHasAttr) {
-                        // Note: this will show a value here even if it's invalid
-                        // in which case it will revert to default.
-                        groupOpts[attrFound] = true;
-
-                        // Note: only one trace in the stack will get a _fullData
-                        // entry for a given stack-wide attribute. If no traces
-                        // (or the first trace) specify that attribute, the
-                        // first trace will get it. If the first trace does NOT
-                        // specify it but some later trace does, then it gets
-                        // removed from the first trace and only included in the
-                        // one that specified it. This is mostly important for
-                        // editors (that want to see the full values to know
-                        // what settings are available) and Plotly.react diffing.
-                        // Editors may want to use fullLayout._scatterStackOpts
-                        // directly and make these settings available from all
-                        // traces in the stack... then set the new value into
-                        // the first trace, and clear all later traces.
-                        if(!firstTrace) {
-                            delete groupOpts.traces[0][attr];
-
-                            // orientation can affect default fill of previous traces
-                            if(isOrientation) {
-                                for(var j = 0; j < groupOpts.traces.length - 1; j++) {
-                                    var trace2 = groupOpts.traces[j];
-                                    if(trace2._input.fill !== trace2.fill) {
-                                        trace2.fill = groupOpts.fillDflt;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        return groupOpts;
-    }
-};
-
-},{}],658:[function(_dereq_,module,exports){
-/**
-* Copyright 2012-2020, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-
-'use strict';
-
-var d3 = _dereq_('d3');
-var Drawing = _dereq_('../../components/drawing');
-var Registry = _dereq_('../../registry');
-
-function style(gd) {
-    var s = d3.select(gd).selectAll('g.trace.scatter');
-
-    s.style('opacity', function(d) {
-        return d[0].trace.opacity;
-    });
-
-    s.selectAll('g.points').each(function(d) {
-        var sel = d3.select(this);
-        var trace = d.trace || d[0].trace;
-        stylePoints(sel, trace, gd);
-    });
-
-    s.selectAll('g.text').each(function(d) {
-        var sel = d3.select(this);
-        var trace = d.trace || d[0].trace;
-        styleText(sel, trace, gd);
-    });
-
-    s.selectAll('g.trace path.js-line')
-        .call(Drawing.lineGroupStyle);
-
-    s.selectAll('g.trace path.js-fill')
-        .call(Drawing.fillGroupStyle);
-
-    Registry.getComponentMethod('errorbars', 'style')(s);
-}
-
-function stylePoints(sel, trace, gd) {
-    Drawing.pointStyle(sel.selectAll('path.point'), trace, gd);
-}
-
-function styleText(sel, trace, gd) {
-    Drawing.textPointStyle(sel.selectAll('text'), trace, gd);
-}
-
-function styleOnSelect(gd, cd, sel) {
-    var trace = cd[0].trace;
-
-    if(trace.selectedpoints) {
-        Drawing.selectedPointStyle(sel.selectAll('path.point'), trace);
-        Drawing.selectedTextStyle(sel.selectAll('text'), trace);
-    } else {
-        stylePoints(sel, trace, gd);
-        styleText(sel, trace, gd);
-    }
-}
-
-module.exports = {
-    style: style,
-    stylePoints: stylePoints,
-    styleText: styleText,
-    styleOnSelect: styleOnSelect
-};
-
-},{"../../components/drawing":400,"../../registry":606,"d3":81}],659:[function(_dereq_,module,exports){
-/**
-* Copyright 2012-2020, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-
-'use strict';
-
-var Lib = _dereq_('../../lib');
-
-module.exports = {
-    hasLines: function(trace) {
-        return trace.visible && trace.mode &&
-            trace.mode.indexOf('lines') !== -1;
-    },
-
-    hasMarkers: function(trace) {
-        return trace.visible && (
-            (trace.mode && trace.mode.indexOf('markers') !== -1) ||
-            // until splom implements 'mode'
-            trace.type === 'splom'
-        );
-    },
-
-    hasText: function(trace) {
-        return trace.visible && trace.mode &&
-            trace.mode.indexOf('text') !== -1;
-    },
-
-    isBubble: function(trace) {
-        return Lib.isPlainObject(trace.marker) &&
-            Lib.isArrayOrTypedArray(trace.marker.size);
-    }
-};
-
-},{"../../lib":506}],660:[function(_dereq_,module,exports){
-/**
-* Copyright 2012-2020, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-
-'use strict';
-
-var Lib = _dereq_('../../lib');
-
-/*
- * opts: object of flags to control features not all text users support
- *   noSelect: caller does not support selected/unselected attribute containers
- */
-module.exports = function(traceIn, traceOut, layout, coerce, opts) {
-    opts = opts || {};
-
-    coerce('textposition');
-    Lib.coerceFont(coerce, 'textfont', layout.font);
-
-    if(!opts.noSelect) {
-        coerce('selected.textfont.color');
-        coerce('unselected.textfont.color');
-    }
-};
-
-},{"../../lib":506}],661:[function(_dereq_,module,exports){
-/**
-* Copyright 2012-2020, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
-'use strict';
-
-var Lib = _dereq_('../../lib');
-var Registry = _dereq_('../../registry');
-
-module.exports = function handleXYDefaults(traceIn, traceOut, layout, coerce) {
-    var x = coerce('x');
-    var y = coerce('y');
-    var len;
-
-    var handleCalendarDefaults = Registry.getComponentMethod('calendars', 'handleTraceDefaults');
-    handleCalendarDefaults(traceIn, traceOut, ['x', 'y'], layout);
-
-    if(x) {
-        var xlen = Lib.minRowLength(x);
-        if(y) {
-            len = Math.min(xlen, Lib.minRowLength(y));
-        } else {
-            len = xlen;
-            coerce('y0');
-            coerce('dy');
-        }
-    } else {
-        if(!y) return 0;
-
-        len = Lib.minRowLength(y);
-        coerce('x0');
-        coerce('dx');
-    }
-
-    traceOut._length = len;
-
-    return len;
-};
-
-},{"../../lib":506,"../../registry":606}],662:[function(_dereq_,module,exports){
-/**
-* Copyright 2012-2020, Plotly, Inc.
-* All rights reserved.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-
 'use strict';
 
 var scatterAttrs = _dereq_('../scatter/attributes');
@@ -117515,7 +114863,7 @@ var attrs = module.exports = overrideAll({
 
 attrs.x.editType = attrs.y.editType = attrs.z.editType = 'calc+clearAxisTypes';
 
-},{"../../components/colorscale/attributes":385,"../../constants/gl3d_dashes":482,"../../constants/gl3d_markers":483,"../../lib/extend":500,"../../plot_api/edit_types":535,"../../plots/attributes":549,"../../plots/template_attributes":605,"../scatter/attributes":635}],663:[function(_dereq_,module,exports){
+},{"../../components/colorscale/attributes":385,"../../constants/gl3d_dashes":482,"../../constants/gl3d_markers":483,"../../lib/extend":500,"../../plot_api/edit_types":535,"../../plots/attributes":549,"../../plots/template_attributes":605,"../scatter/attributes":641}],635:[function(_dereq_,module,exports){
 /**
 * Copyright 2012-2020, Plotly, Inc.
 * All rights reserved.
@@ -117543,7 +114891,7 @@ module.exports = function calc(gd, trace) {
     return cd;
 };
 
-},{"../scatter/arrays_to_calcdata":634,"../scatter/colorscale_calc":638}],664:[function(_dereq_,module,exports){
+},{"../scatter/arrays_to_calcdata":640,"../scatter/colorscale_calc":644}],636:[function(_dereq_,module,exports){
 /**
 * Copyright 2012-2020, Plotly, Inc.
 * All rights reserved.
@@ -117630,7 +114978,7 @@ function calculateErrors(data, scaleFactor, sceneLayout) {
 
 module.exports = calculateErrors;
 
-},{"../../registry":606}],665:[function(_dereq_,module,exports){
+},{"../../registry":606}],637:[function(_dereq_,module,exports){
 /**
 * Copyright 2012-2020, Plotly, Inc.
 * All rights reserved.
@@ -118172,7 +115520,7 @@ function createLineWithMarkers(scene, data) {
 
 module.exports = createLineWithMarkers;
 
-},{"../../components/fx/helpers":414,"../../constants/gl3d_dashes":482,"../../constants/gl3d_markers":483,"../../lib":506,"../../lib/gl_format_color":504,"../../lib/str2rgbarray":528,"../../plots/cartesian/axes":552,"../scatter/make_bubble_size_func":652,"./calc_errors":664,"delaunay-triangulate":83,"gl-error3d":110,"gl-line3d":115,"gl-mesh3d":139,"gl-scatter3d":147}],666:[function(_dereq_,module,exports){
+},{"../../components/fx/helpers":414,"../../constants/gl3d_dashes":482,"../../constants/gl3d_markers":483,"../../lib":506,"../../lib/gl_format_color":504,"../../lib/str2rgbarray":528,"../../plots/cartesian/axes":552,"../scatter/make_bubble_size_func":658,"./calc_errors":636,"delaunay-triangulate":83,"gl-error3d":110,"gl-line3d":115,"gl-mesh3d":139,"gl-scatter3d":147}],638:[function(_dereq_,module,exports){
 /**
 * Copyright 2012-2020, Plotly, Inc.
 * All rights reserved.
@@ -118261,7 +115609,7 @@ function handleXYZDefaults(traceIn, traceOut, coerce, layout) {
     return len;
 }
 
-},{"../../lib":506,"../../registry":606,"../scatter/line_defaults":648,"../scatter/marker_defaults":654,"../scatter/subtypes":659,"../scatter/text_defaults":660,"./attributes":662}],667:[function(_dereq_,module,exports){
+},{"../../lib":506,"../../registry":606,"../scatter/line_defaults":654,"../scatter/marker_defaults":660,"../scatter/subtypes":665,"../scatter/text_defaults":666,"./attributes":634}],639:[function(_dereq_,module,exports){
 /**
 * Copyright 2012-2020, Plotly, Inc.
 * All rights reserved.
@@ -118300,7 +115648,3214 @@ module.exports = {
     }
 };
 
-},{"../../constants/gl3d_markers":483,"../../plots/gl3d":583,"./attributes":662,"./calc":663,"./convert":665,"./defaults":666}],668:[function(_dereq_,module,exports){
+},{"../../constants/gl3d_markers":483,"../../plots/gl3d":583,"./attributes":634,"./calc":635,"./convert":637,"./defaults":638}],640:[function(_dereq_,module,exports){
+/**
+* Copyright 2012-2020, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+
+'use strict';
+
+var Lib = _dereq_('../../lib');
+
+
+// arrayOk attributes, merge them into calcdata array
+module.exports = function arraysToCalcdata(cd, trace) {
+    // so each point knows which index it originally came from
+    for(var i = 0; i < cd.length; i++) cd[i].i = i;
+
+    Lib.mergeArray(trace.text, cd, 'tx');
+    Lib.mergeArray(trace.texttemplate, cd, 'txt');
+    Lib.mergeArray(trace.hovertext, cd, 'htx');
+    Lib.mergeArray(trace.customdata, cd, 'data');
+    Lib.mergeArray(trace.textposition, cd, 'tp');
+    if(trace.textfont) {
+        Lib.mergeArrayCastPositive(trace.textfont.size, cd, 'ts');
+        Lib.mergeArray(trace.textfont.color, cd, 'tc');
+        Lib.mergeArray(trace.textfont.family, cd, 'tf');
+    }
+
+    var marker = trace.marker;
+    if(marker) {
+        Lib.mergeArrayCastPositive(marker.size, cd, 'ms');
+        Lib.mergeArrayCastPositive(marker.opacity, cd, 'mo');
+        Lib.mergeArray(marker.symbol, cd, 'mx');
+        Lib.mergeArray(marker.color, cd, 'mc');
+
+        var markerLine = marker.line;
+        if(marker.line) {
+            Lib.mergeArray(markerLine.color, cd, 'mlc');
+            Lib.mergeArrayCastPositive(markerLine.width, cd, 'mlw');
+        }
+
+        var markerGradient = marker.gradient;
+        if(markerGradient && markerGradient.type !== 'none') {
+            Lib.mergeArray(markerGradient.type, cd, 'mgt');
+            Lib.mergeArray(markerGradient.color, cd, 'mgc');
+        }
+    }
+};
+
+},{"../../lib":506}],641:[function(_dereq_,module,exports){
+/**
+* Copyright 2012-2020, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+'use strict';
+
+var texttemplateAttrs = _dereq_('../../plots/template_attributes').texttemplateAttrs;
+var hovertemplateAttrs = _dereq_('../../plots/template_attributes').hovertemplateAttrs;
+var colorScaleAttrs = _dereq_('../../components/colorscale/attributes');
+var fontAttrs = _dereq_('../../plots/font_attributes');
+var dash = _dereq_('../../components/drawing/attributes').dash;
+
+var Drawing = _dereq_('../../components/drawing');
+var constants = _dereq_('./constants');
+var extendFlat = _dereq_('../../lib/extend').extendFlat;
+
+module.exports = {
+    x: {
+        valType: 'data_array',
+        editType: 'calc+clearAxisTypes',
+        anim: true,
+        
+    },
+    x0: {
+        valType: 'any',
+        dflt: 0,
+        
+        editType: 'calc+clearAxisTypes',
+        anim: true,
+        
+    },
+    dx: {
+        valType: 'number',
+        dflt: 1,
+        
+        editType: 'calc',
+        anim: true,
+        
+    },
+    y: {
+        valType: 'data_array',
+        editType: 'calc+clearAxisTypes',
+        anim: true,
+        
+    },
+    y0: {
+        valType: 'any',
+        dflt: 0,
+        
+        editType: 'calc+clearAxisTypes',
+        anim: true,
+        
+    },
+    dy: {
+        valType: 'number',
+        dflt: 1,
+        
+        editType: 'calc',
+        anim: true,
+        
+    },
+
+    stackgroup: {
+        valType: 'string',
+        
+        dflt: '',
+        editType: 'calc',
+        
+    },
+    orientation: {
+        valType: 'enumerated',
+        
+        values: ['v', 'h'],
+        editType: 'calc',
+        
+    },
+    groupnorm: {
+        valType: 'enumerated',
+        values: ['', 'fraction', 'percent'],
+        dflt: '',
+        
+        editType: 'calc',
+        
+    },
+    stackgaps: {
+        valType: 'enumerated',
+        values: ['infer zero', 'interpolate'],
+        dflt: 'infer zero',
+        
+        editType: 'calc',
+        
+    },
+
+    text: {
+        valType: 'string',
+        
+        dflt: '',
+        arrayOk: true,
+        editType: 'calc',
+        
+    },
+
+    texttemplate: texttemplateAttrs({}, {
+
+    }),
+    hovertext: {
+        valType: 'string',
+        
+        dflt: '',
+        arrayOk: true,
+        editType: 'style',
+        
+    },
+    mode: {
+        valType: 'flaglist',
+        flags: ['lines', 'markers', 'text'],
+        extras: ['none'],
+        
+        editType: 'calc',
+        
+    },
+    hoveron: {
+        valType: 'flaglist',
+        flags: ['points', 'fills'],
+        
+        editType: 'style',
+        
+    },
+    hovertemplate: hovertemplateAttrs({}, {
+        keys: constants.eventDataKeys
+    }),
+    line: {
+        color: {
+            valType: 'color',
+            
+            editType: 'style',
+            anim: true,
+            
+        },
+        width: {
+            valType: 'number',
+            min: 0,
+            dflt: 2,
+            
+            editType: 'style',
+            anim: true,
+            
+        },
+        shape: {
+            valType: 'enumerated',
+            values: ['linear', 'spline', 'hv', 'vh', 'hvh', 'vhv'],
+            dflt: 'linear',
+            
+            editType: 'plot',
+            
+        },
+        smoothing: {
+            valType: 'number',
+            min: 0,
+            max: 1.3,
+            dflt: 1,
+            
+            editType: 'plot',
+            
+        },
+        dash: extendFlat({}, dash, {editType: 'style'}),
+        simplify: {
+            valType: 'boolean',
+            dflt: true,
+            
+            editType: 'plot',
+            
+        },
+        editType: 'plot'
+    },
+
+    connectgaps: {
+        valType: 'boolean',
+        dflt: false,
+        
+        editType: 'calc',
+        
+    },
+    cliponaxis: {
+        valType: 'boolean',
+        dflt: true,
+        
+        editType: 'plot',
+        
+    },
+
+    fill: {
+        valType: 'enumerated',
+        values: ['none', 'tozeroy', 'tozerox', 'tonexty', 'tonextx', 'toself', 'tonext'],
+        
+        editType: 'calc',
+        
+    },
+    fillcolor: {
+        valType: 'color',
+        
+        editType: 'style',
+        anim: true,
+        
+    },
+    marker: extendFlat({
+        symbol: {
+            valType: 'enumerated',
+            values: Drawing.symbolList,
+            dflt: 'circle',
+            arrayOk: true,
+            
+            editType: 'style',
+            
+        },
+        opacity: {
+            valType: 'number',
+            min: 0,
+            max: 1,
+            arrayOk: true,
+            
+            editType: 'style',
+            anim: true,
+            
+        },
+        size: {
+            valType: 'number',
+            min: 0,
+            dflt: 6,
+            arrayOk: true,
+            
+            editType: 'calc',
+            anim: true,
+            
+        },
+        maxdisplayed: {
+            valType: 'number',
+            min: 0,
+            dflt: 0,
+            
+            editType: 'plot',
+            
+        },
+        sizeref: {
+            valType: 'number',
+            dflt: 1,
+            
+            editType: 'calc',
+            
+        },
+        sizemin: {
+            valType: 'number',
+            min: 0,
+            dflt: 0,
+            
+            editType: 'calc',
+            
+        },
+        sizemode: {
+            valType: 'enumerated',
+            values: ['diameter', 'area'],
+            dflt: 'diameter',
+            
+            editType: 'calc',
+            
+        },
+
+        line: extendFlat({
+            width: {
+                valType: 'number',
+                min: 0,
+                arrayOk: true,
+                
+                editType: 'style',
+                anim: true,
+                
+            },
+            editType: 'calc'
+        },
+            colorScaleAttrs('marker.line', {anim: true})
+        ),
+        gradient: {
+            type: {
+                valType: 'enumerated',
+                values: ['radial', 'horizontal', 'vertical', 'none'],
+                arrayOk: true,
+                dflt: 'none',
+                
+                editType: 'calc',
+                
+            },
+            color: {
+                valType: 'color',
+                arrayOk: true,
+                
+                editType: 'calc',
+                
+            },
+            editType: 'calc'
+        },
+        editType: 'calc'
+    },
+        colorScaleAttrs('marker', {anim: true})
+    ),
+    selected: {
+        marker: {
+            opacity: {
+                valType: 'number',
+                min: 0,
+                max: 1,
+                
+                editType: 'style',
+                
+            },
+            color: {
+                valType: 'color',
+                
+                editType: 'style',
+                
+            },
+            size: {
+                valType: 'number',
+                min: 0,
+                
+                editType: 'style',
+                
+            },
+            editType: 'style'
+        },
+        textfont: {
+            color: {
+                valType: 'color',
+                
+                editType: 'style',
+                
+            },
+            editType: 'style'
+        },
+        editType: 'style'
+    },
+    unselected: {
+        marker: {
+            opacity: {
+                valType: 'number',
+                min: 0,
+                max: 1,
+                
+                editType: 'style',
+                
+            },
+            color: {
+                valType: 'color',
+                
+                editType: 'style',
+                
+            },
+            size: {
+                valType: 'number',
+                min: 0,
+                
+                editType: 'style',
+                
+            },
+            editType: 'style'
+        },
+        textfont: {
+            color: {
+                valType: 'color',
+                
+                editType: 'style',
+                
+            },
+            editType: 'style'
+        },
+        editType: 'style'
+    },
+
+    textposition: {
+        valType: 'enumerated',
+        values: [
+            'top left', 'top center', 'top right',
+            'middle left', 'middle center', 'middle right',
+            'bottom left', 'bottom center', 'bottom right'
+        ],
+        dflt: 'middle center',
+        arrayOk: true,
+        
+        editType: 'calc',
+        
+    },
+    textfont: fontAttrs({
+        editType: 'calc',
+        colorEditType: 'style',
+        arrayOk: true,
+        
+    }),
+
+    r: {
+        valType: 'data_array',
+        editType: 'calc',
+        
+    },
+    t: {
+        valType: 'data_array',
+        editType: 'calc',
+        
+    }
+};
+
+},{"../../components/colorscale/attributes":385,"../../components/drawing":400,"../../components/drawing/attributes":399,"../../lib/extend":500,"../../plots/font_attributes":580,"../../plots/template_attributes":605,"./constants":645}],642:[function(_dereq_,module,exports){
+/**
+* Copyright 2012-2020, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+'use strict';
+
+var isNumeric = _dereq_('fast-isnumeric');
+var Lib = _dereq_('../../lib');
+
+var Axes = _dereq_('../../plots/cartesian/axes');
+var BADNUM = _dereq_('../../constants/numerical').BADNUM;
+
+var subTypes = _dereq_('./subtypes');
+var calcColorscale = _dereq_('./colorscale_calc');
+var arraysToCalcdata = _dereq_('./arrays_to_calcdata');
+var calcSelection = _dereq_('./calc_selection');
+
+function calc(gd, trace) {
+    var fullLayout = gd._fullLayout;
+    var xa = Axes.getFromId(gd, trace.xaxis || 'x');
+    var ya = Axes.getFromId(gd, trace.yaxis || 'y');
+    var x = xa.makeCalcdata(trace, 'x');
+    var y = ya.makeCalcdata(trace, 'y');
+    var serieslen = trace._length;
+    var cd = new Array(serieslen);
+    var ids = trace.ids;
+    var stackGroupOpts = getStackOpts(trace, fullLayout, xa, ya);
+    var interpolateGaps = false;
+    var isV, i, j, k, interpolate, vali;
+
+    setFirstScatter(fullLayout, trace);
+
+    var xAttr = 'x';
+    var yAttr = 'y';
+    var posAttr;
+    if(stackGroupOpts) {
+        Lib.pushUnique(stackGroupOpts.traceIndices, trace._expandedIndex);
+        isV = stackGroupOpts.orientation === 'v';
+
+        // size, like we use for bar
+        if(isV) {
+            yAttr = 's';
+            posAttr = 'x';
+        } else {
+            xAttr = 's';
+            posAttr = 'y';
+        }
+        interpolate = stackGroupOpts.stackgaps === 'interpolate';
+    } else {
+        var ppad = calcMarkerSize(trace, serieslen);
+        calcAxisExpansion(gd, trace, xa, ya, x, y, ppad);
+    }
+
+    for(i = 0; i < serieslen; i++) {
+        var cdi = cd[i] = {};
+        var xValid = isNumeric(x[i]);
+        var yValid = isNumeric(y[i]);
+        if(xValid && yValid) {
+            cdi[xAttr] = x[i];
+            cdi[yAttr] = y[i];
+        } else if(stackGroupOpts && (isV ? xValid : yValid)) {
+            // if we're stacking we need to hold on to all valid positions
+            // even with invalid sizes
+
+            cdi[posAttr] = isV ? x[i] : y[i];
+            cdi.gap = true;
+            if(interpolate) {
+                cdi.s = BADNUM;
+                interpolateGaps = true;
+            } else {
+                cdi.s = 0;
+            }
+        } else {
+            cdi[xAttr] = cdi[yAttr] = BADNUM;
+        }
+
+        if(ids) {
+            cdi.id = String(ids[i]);
+        }
+    }
+
+    arraysToCalcdata(cd, trace);
+    calcColorscale(gd, trace);
+    calcSelection(cd, trace);
+
+    if(stackGroupOpts) {
+        // remove bad positions and sort
+        // note that original indices get added to cd in arraysToCalcdata
+        i = 0;
+        while(i < cd.length) {
+            if(cd[i][posAttr] === BADNUM) {
+                cd.splice(i, 1);
+            } else i++;
+        }
+
+        Lib.sort(cd, function(a, b) {
+            return (a[posAttr] - b[posAttr]) || (a.i - b.i);
+        });
+
+        if(interpolateGaps) {
+            // first fill the beginning with constant from the first point
+            i = 0;
+            while(i < cd.length - 1 && cd[i].gap) {
+                i++;
+            }
+            vali = cd[i].s;
+            if(!vali) vali = cd[i].s = 0; // in case of no data AT ALL in this trace - use 0
+            for(j = 0; j < i; j++) {
+                cd[j].s = vali;
+            }
+            // then fill the end with constant from the last point
+            k = cd.length - 1;
+            while(k > i && cd[k].gap) {
+                k--;
+            }
+            vali = cd[k].s;
+            for(j = cd.length - 1; j > k; j--) {
+                cd[j].s = vali;
+            }
+            // now interpolate internal gaps linearly
+            while(i < k) {
+                i++;
+                if(cd[i].gap) {
+                    j = i + 1;
+                    while(cd[j].gap) {
+                        j++;
+                    }
+                    var pos0 = cd[i - 1][posAttr];
+                    var size0 = cd[i - 1].s;
+                    var m = (cd[j].s - size0) / (cd[j][posAttr] - pos0);
+                    while(i < j) {
+                        cd[i].s = size0 + (cd[i][posAttr] - pos0) * m;
+                        i++;
+                    }
+                }
+            }
+        }
+    }
+
+    return cd;
+}
+
+function calcAxisExpansion(gd, trace, xa, ya, x, y, ppad) {
+    var serieslen = trace._length;
+    var fullLayout = gd._fullLayout;
+    var xId = xa._id;
+    var yId = ya._id;
+    var firstScatter = fullLayout._firstScatter[firstScatterGroup(trace)] === trace.uid;
+    var stackOrientation = (getStackOpts(trace, fullLayout, xa, ya) || {}).orientation;
+    var fill = trace.fill;
+
+    // cancel minimum tick spacings (only applies to bars and boxes)
+    xa._minDtick = 0;
+    ya._minDtick = 0;
+
+    // check whether bounds should be tight, padded, extended to zero...
+    // most cases both should be padded on both ends, so start with that.
+    var xOptions = {padded: true};
+    var yOptions = {padded: true};
+
+    if(ppad) {
+        xOptions.ppad = yOptions.ppad = ppad;
+    }
+
+    // TODO: text size
+
+    var openEnded = serieslen < 2 || (x[0] !== x[serieslen - 1]) || (y[0] !== y[serieslen - 1]);
+
+    if(openEnded && (
+        (fill === 'tozerox') ||
+        ((fill === 'tonextx') && (firstScatter || stackOrientation === 'h'))
+    )) {
+        // include zero (tight) and extremes (padded) if fill to zero
+        // (unless the shape is closed, then it's just filling the shape regardless)
+
+        xOptions.tozero = true;
+    } else if(!(trace.error_y || {}).visible && (
+        // if no error bars, markers or text, or fill to y=0 remove x padding
+
+            (fill === 'tonexty' || fill === 'tozeroy') ||
+            (!subTypes.hasMarkers(trace) && !subTypes.hasText(trace))
+        )) {
+        xOptions.padded = false;
+        xOptions.ppad = 0;
+    }
+
+    if(openEnded && (
+        (fill === 'tozeroy') ||
+        ((fill === 'tonexty') && (firstScatter || stackOrientation === 'v'))
+    )) {
+        // now check for y - rather different logic, though still mostly padded both ends
+        // include zero (tight) and extremes (padded) if fill to zero
+        // (unless the shape is closed, then it's just filling the shape regardless)
+
+        yOptions.tozero = true;
+    } else if(fill === 'tonextx' || fill === 'tozerox') {
+        // tight y: any x fill
+
+        yOptions.padded = false;
+    }
+
+    // N.B. asymmetric splom traces call this with blank {} xa or ya
+    if(xId) trace._extremes[xId] = Axes.findExtremes(xa, x, xOptions);
+    if(yId) trace._extremes[yId] = Axes.findExtremes(ya, y, yOptions);
+}
+
+function calcMarkerSize(trace, serieslen) {
+    if(!subTypes.hasMarkers(trace)) return;
+
+    // Treat size like x or y arrays --- Run d2c
+    // this needs to go before ppad computation
+    var marker = trace.marker;
+    var sizeref = 1.6 * (trace.marker.sizeref || 1);
+    var markerTrans;
+
+    if(trace.marker.sizemode === 'area') {
+        markerTrans = function(v) {
+            return Math.max(Math.sqrt((v || 0) / sizeref), 3);
+        };
+    } else {
+        markerTrans = function(v) {
+            return Math.max((v || 0) / sizeref, 3);
+        };
+    }
+
+    if(Lib.isArrayOrTypedArray(marker.size)) {
+        // I tried auto-type but category and dates dont make much sense.
+        var ax = {type: 'linear'};
+        Axes.setConvert(ax);
+
+        var s = ax.makeCalcdata(trace.marker, 'size');
+
+        var sizeOut = new Array(serieslen);
+        for(var i = 0; i < serieslen; i++) {
+            sizeOut[i] = markerTrans(s[i]);
+        }
+        return sizeOut;
+    } else {
+        return markerTrans(marker.size);
+    }
+}
+
+/**
+ * mark the first scatter trace for each subplot
+ * note that scatter and scattergl each get their own first trace
+ * note also that I'm doing this during calc rather than supplyDefaults
+ * so I don't need to worry about transforms, but if we ever do
+ * per-trace calc this will get confused.
+ */
+function setFirstScatter(fullLayout, trace) {
+    var group = firstScatterGroup(trace);
+    var firstScatter = fullLayout._firstScatter;
+    if(!firstScatter[group]) firstScatter[group] = trace.uid;
+}
+
+function firstScatterGroup(trace) {
+    var stackGroup = trace.stackgroup;
+    return trace.xaxis + trace.yaxis + trace.type +
+        (stackGroup ? '-' + stackGroup : '');
+}
+
+function getStackOpts(trace, fullLayout, xa, ya) {
+    var stackGroup = trace.stackgroup;
+    if(!stackGroup) return;
+    var stackOpts = fullLayout._scatterStackOpts[xa._id + ya._id][stackGroup];
+    var stackAx = stackOpts.orientation === 'v' ? ya : xa;
+    // Allow stacking only on numeric axes
+    // calc is a little late to be figuring this out, but during supplyDefaults
+    // we don't know the axis type yet
+    if(stackAx.type === 'linear' || stackAx.type === 'log') return stackOpts;
+}
+
+module.exports = {
+    calc: calc,
+    calcMarkerSize: calcMarkerSize,
+    calcAxisExpansion: calcAxisExpansion,
+    setFirstScatter: setFirstScatter,
+    getStackOpts: getStackOpts
+};
+
+},{"../../constants/numerical":485,"../../lib":506,"../../plots/cartesian/axes":552,"./arrays_to_calcdata":640,"./calc_selection":643,"./colorscale_calc":644,"./subtypes":665,"fast-isnumeric":90}],643:[function(_dereq_,module,exports){
+/**
+* Copyright 2012-2020, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+'use strict';
+
+var Lib = _dereq_('../../lib');
+
+module.exports = function calcSelection(cd, trace) {
+    if(Lib.isArrayOrTypedArray(trace.selectedpoints)) {
+        Lib.tagSelected(cd, trace);
+    }
+};
+
+},{"../../lib":506}],644:[function(_dereq_,module,exports){
+/**
+* Copyright 2012-2020, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+'use strict';
+
+var hasColorscale = _dereq_('../../components/colorscale/helpers').hasColorscale;
+var calcColorscale = _dereq_('../../components/colorscale/calc');
+
+var subTypes = _dereq_('./subtypes');
+
+module.exports = function calcMarkerColorscale(gd, trace) {
+    if(subTypes.hasLines(trace) && hasColorscale(trace, 'line')) {
+        calcColorscale(gd, trace, {
+            vals: trace.line.color,
+            containerStr: 'line',
+            cLetter: 'c'
+        });
+    }
+
+    if(subTypes.hasMarkers(trace)) {
+        if(hasColorscale(trace, 'marker')) {
+            calcColorscale(gd, trace, {
+                vals: trace.marker.color,
+                containerStr: 'marker',
+                cLetter: 'c'
+            });
+        }
+        if(hasColorscale(trace, 'marker.line')) {
+            calcColorscale(gd, trace, {
+                vals: trace.marker.line.color,
+                containerStr: 'marker.line',
+                cLetter: 'c'
+            });
+        }
+    }
+};
+
+},{"../../components/colorscale/calc":386,"../../components/colorscale/helpers":389,"./subtypes":665}],645:[function(_dereq_,module,exports){
+/**
+* Copyright 2012-2020, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+
+'use strict';
+
+module.exports = {
+    PTS_LINESONLY: 20,
+
+    // fixed parameters of clustering and clipping algorithms
+
+    // fraction of clustering tolerance "so close we don't even consider it a new point"
+    minTolerance: 0.2,
+    // how fast does clustering tolerance increase as you get away from the visible region
+    toleranceGrowth: 10,
+
+    // number of viewport sizes away from the visible region
+    // at which we clip all lines to the perimeter
+    maxScreensAway: 20,
+
+    eventDataKeys: []
+};
+
+},{}],646:[function(_dereq_,module,exports){
+/**
+* Copyright 2012-2020, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+
+'use strict';
+
+var calc = _dereq_('./calc');
+
+/*
+ * Scatter stacking & normalization calculations
+ * runs per subplot, and can handle multiple stacking groups
+ */
+
+module.exports = function crossTraceCalc(gd, plotinfo) {
+    var xa = plotinfo.xaxis;
+    var ya = plotinfo.yaxis;
+    var subplot = xa._id + ya._id;
+
+    var subplotStackOpts = gd._fullLayout._scatterStackOpts[subplot];
+    if(!subplotStackOpts) return;
+
+    var calcTraces = gd.calcdata;
+
+    var i, j, k, i2, cd, cd0, posj, sumj, norm;
+    var groupOpts, interpolate, groupnorm, posAttr, valAttr;
+    var hasAnyBlanks;
+
+    for(var stackGroup in subplotStackOpts) {
+        groupOpts = subplotStackOpts[stackGroup];
+        var indices = groupOpts.traceIndices;
+
+        // can get here with no indices if the stack axis is non-numeric
+        if(!indices.length) continue;
+
+        interpolate = groupOpts.stackgaps === 'interpolate';
+        groupnorm = groupOpts.groupnorm;
+        if(groupOpts.orientation === 'v') {
+            posAttr = 'x';
+            valAttr = 'y';
+        } else {
+            posAttr = 'y';
+            valAttr = 'x';
+        }
+        hasAnyBlanks = new Array(indices.length);
+        for(i = 0; i < hasAnyBlanks.length; i++) {
+            hasAnyBlanks[i] = false;
+        }
+
+        // Collect the complete set of all positions across ALL traces.
+        // Start with the first trace, then interleave items from later traces
+        // as needed.
+        // Fill in mising items as we go.
+        cd0 = calcTraces[indices[0]];
+        var allPositions = new Array(cd0.length);
+        for(i = 0; i < cd0.length; i++) {
+            allPositions[i] = cd0[i][posAttr];
+        }
+
+        for(i = 1; i < indices.length; i++) {
+            cd = calcTraces[indices[i]];
+
+            for(j = k = 0; j < cd.length; j++) {
+                posj = cd[j][posAttr];
+                for(; posj > allPositions[k] && k < allPositions.length; k++) {
+                    // the current trace is missing a position from some previous trace(s)
+                    insertBlank(cd, j, allPositions[k], i, hasAnyBlanks, interpolate, posAttr);
+                    j++;
+                }
+                if(posj !== allPositions[k]) {
+                    // previous trace(s) are missing a position from the current trace
+                    for(i2 = 0; i2 < i; i2++) {
+                        insertBlank(calcTraces[indices[i2]], k, posj, i2, hasAnyBlanks, interpolate, posAttr);
+                    }
+                    allPositions.splice(k, 0, posj);
+                }
+                k++;
+            }
+            for(; k < allPositions.length; k++) {
+                insertBlank(cd, j, allPositions[k], i, hasAnyBlanks, interpolate, posAttr);
+                j++;
+            }
+        }
+
+        var serieslen = allPositions.length;
+
+        // stack (and normalize)!
+        for(j = 0; j < cd0.length; j++) {
+            sumj = cd0[j][valAttr] = cd0[j].s;
+            for(i = 1; i < indices.length; i++) {
+                cd = calcTraces[indices[i]];
+                cd[0].trace._rawLength = cd[0].trace._length;
+                cd[0].trace._length = serieslen;
+                sumj += cd[j].s;
+                cd[j][valAttr] = sumj;
+            }
+
+            if(groupnorm) {
+                norm = ((groupnorm === 'fraction') ? sumj : (sumj / 100)) || 1;
+                for(i = 0; i < indices.length; i++) {
+                    var cdj = calcTraces[indices[i]][j];
+                    cdj[valAttr] /= norm;
+                    cdj.sNorm = cdj.s / norm;
+                }
+            }
+        }
+
+        // autorange
+        for(i = 0; i < indices.length; i++) {
+            cd = calcTraces[indices[i]];
+            var trace = cd[0].trace;
+            var ppad = calc.calcMarkerSize(trace, trace._rawLength);
+            var arrayPad = Array.isArray(ppad);
+            if((ppad && hasAnyBlanks[i]) || arrayPad) {
+                var ppadRaw = ppad;
+                ppad = new Array(serieslen);
+                for(j = 0; j < serieslen; j++) {
+                    ppad[j] = cd[j].gap ? 0 : (arrayPad ? ppadRaw[cd[j].i] : ppadRaw);
+                }
+            }
+            var x = new Array(serieslen);
+            var y = new Array(serieslen);
+            for(j = 0; j < serieslen; j++) {
+                x[j] = cd[j].x;
+                y[j] = cd[j].y;
+            }
+            calc.calcAxisExpansion(gd, trace, xa, ya, x, y, ppad);
+
+            // while we're here (in a loop over all traces in the stack)
+            // record the orientation, so hover can find it easily
+            cd[0].t.orientation = groupOpts.orientation;
+        }
+    }
+};
+
+function insertBlank(calcTrace, index, position, traceIndex, hasAnyBlanks, interpolate, posAttr) {
+    hasAnyBlanks[traceIndex] = true;
+    var newEntry = {
+        i: null,
+        gap: true,
+        s: 0
+    };
+    newEntry[posAttr] = position;
+    calcTrace.splice(index, 0, newEntry);
+    // Even if we're not interpolating, if one trace has multiple
+    // values at the same position and this trace only has one value there,
+    // we just duplicate that one value rather than insert a zero.
+    // We also make it look like a real point - because it's ambiguous which
+    // one really is the real one!
+    if(index && position === calcTrace[index - 1][posAttr]) {
+        var prevEntry = calcTrace[index - 1];
+        newEntry.s = prevEntry.s;
+        // TODO is it going to cause any problems to have multiple
+        // calcdata points with the same index?
+        newEntry.i = prevEntry.i;
+        newEntry.gap = prevEntry.gap;
+    } else if(interpolate) {
+        newEntry.s = getInterp(calcTrace, index, position, posAttr);
+    }
+    if(!index) {
+        // t and trace need to stay on the first cd entry
+        calcTrace[0].t = calcTrace[1].t;
+        calcTrace[0].trace = calcTrace[1].trace;
+        delete calcTrace[1].t;
+        delete calcTrace[1].trace;
+    }
+}
+
+function getInterp(calcTrace, index, position, posAttr) {
+    var pt0 = calcTrace[index - 1];
+    var pt1 = calcTrace[index + 1];
+    if(!pt1) return pt0.s;
+    if(!pt0) return pt1.s;
+    return pt0.s + (pt1.s - pt0.s) * (position - pt0[posAttr]) / (pt1[posAttr] - pt0[posAttr]);
+}
+
+},{"./calc":642}],647:[function(_dereq_,module,exports){
+/**
+* Copyright 2012-2020, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+
+'use strict';
+
+
+// remove opacity for any trace that has a fill or is filled to
+module.exports = function crossTraceDefaults(fullData) {
+    for(var i = 0; i < fullData.length; i++) {
+        var tracei = fullData[i];
+        if(tracei.type !== 'scatter') continue;
+
+        var filli = tracei.fill;
+        if(filli === 'none' || filli === 'toself') continue;
+
+        tracei.opacity = undefined;
+
+        if(filli === 'tonexty' || filli === 'tonextx') {
+            for(var j = i - 1; j >= 0; j--) {
+                var tracej = fullData[j];
+
+                if((tracej.type === 'scatter') &&
+                        (tracej.xaxis === tracei.xaxis) &&
+                        (tracej.yaxis === tracei.yaxis)) {
+                    tracej.opacity = undefined;
+                    break;
+                }
+            }
+        }
+    }
+};
+
+},{}],648:[function(_dereq_,module,exports){
+/**
+* Copyright 2012-2020, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+'use strict';
+
+var Lib = _dereq_('../../lib');
+var Registry = _dereq_('../../registry');
+
+var attributes = _dereq_('./attributes');
+var constants = _dereq_('./constants');
+var subTypes = _dereq_('./subtypes');
+var handleXYDefaults = _dereq_('./xy_defaults');
+var handleStackDefaults = _dereq_('./stack_defaults');
+var handleMarkerDefaults = _dereq_('./marker_defaults');
+var handleLineDefaults = _dereq_('./line_defaults');
+var handleLineShapeDefaults = _dereq_('./line_shape_defaults');
+var handleTextDefaults = _dereq_('./text_defaults');
+var handleFillColorDefaults = _dereq_('./fillcolor_defaults');
+
+module.exports = function supplyDefaults(traceIn, traceOut, defaultColor, layout) {
+    function coerce(attr, dflt) {
+        return Lib.coerce(traceIn, traceOut, attributes, attr, dflt);
+    }
+
+    var len = handleXYDefaults(traceIn, traceOut, layout, coerce);
+    if(!len) traceOut.visible = false;
+
+    if(!traceOut.visible) return;
+
+    var stackGroupOpts = handleStackDefaults(traceIn, traceOut, layout, coerce);
+
+    var defaultMode = !stackGroupOpts && (len < constants.PTS_LINESONLY) ?
+        'lines+markers' : 'lines';
+    coerce('text');
+    coerce('hovertext');
+    coerce('mode', defaultMode);
+
+    if(subTypes.hasLines(traceOut)) {
+        handleLineDefaults(traceIn, traceOut, defaultColor, layout, coerce);
+        handleLineShapeDefaults(traceIn, traceOut, coerce);
+        coerce('connectgaps');
+        coerce('line.simplify');
+    }
+
+    if(subTypes.hasMarkers(traceOut)) {
+        handleMarkerDefaults(traceIn, traceOut, defaultColor, layout, coerce, {gradient: true});
+    }
+
+    if(subTypes.hasText(traceOut)) {
+        coerce('texttemplate');
+        handleTextDefaults(traceIn, traceOut, layout, coerce);
+    }
+
+    var dfltHoverOn = [];
+
+    if(subTypes.hasMarkers(traceOut) || subTypes.hasText(traceOut)) {
+        coerce('cliponaxis');
+        coerce('marker.maxdisplayed');
+        dfltHoverOn.push('points');
+    }
+
+    // It's possible for this default to be changed by a later trace.
+    // We handle that case in some hacky code inside handleStackDefaults.
+    coerce('fill', stackGroupOpts ? stackGroupOpts.fillDflt : 'none');
+    if(traceOut.fill !== 'none') {
+        handleFillColorDefaults(traceIn, traceOut, defaultColor, coerce);
+        if(!subTypes.hasLines(traceOut)) handleLineShapeDefaults(traceIn, traceOut, coerce);
+    }
+
+    var lineColor = (traceOut.line || {}).color;
+    var markerColor = (traceOut.marker || {}).color;
+
+    if(traceOut.fill === 'tonext' || traceOut.fill === 'toself') {
+        dfltHoverOn.push('fills');
+    }
+    coerce('hoveron', dfltHoverOn.join('+') || 'points');
+    if(traceOut.hoveron !== 'fills') coerce('hovertemplate');
+    var errorBarsSupplyDefaults = Registry.getComponentMethod('errorbars', 'supplyDefaults');
+    errorBarsSupplyDefaults(traceIn, traceOut, lineColor || markerColor || defaultColor, {axis: 'y'});
+    errorBarsSupplyDefaults(traceIn, traceOut, lineColor || markerColor || defaultColor, {axis: 'x', inherit: 'y'});
+
+    Lib.coerceSelectionMarkerOpacity(traceOut, coerce);
+};
+
+},{"../../lib":506,"../../registry":606,"./attributes":641,"./constants":645,"./fillcolor_defaults":649,"./line_defaults":654,"./line_shape_defaults":656,"./marker_defaults":660,"./stack_defaults":663,"./subtypes":665,"./text_defaults":666,"./xy_defaults":667}],649:[function(_dereq_,module,exports){
+/**
+* Copyright 2012-2020, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+
+'use strict';
+
+var Color = _dereq_('../../components/color');
+var isArrayOrTypedArray = _dereq_('../../lib').isArrayOrTypedArray;
+
+module.exports = function fillColorDefaults(traceIn, traceOut, defaultColor, coerce) {
+    var inheritColorFromMarker = false;
+
+    if(traceOut.marker) {
+        // don't try to inherit a color array
+        var markerColor = traceOut.marker.color;
+        var markerLineColor = (traceOut.marker.line || {}).color;
+
+        if(markerColor && !isArrayOrTypedArray(markerColor)) {
+            inheritColorFromMarker = markerColor;
+        } else if(markerLineColor && !isArrayOrTypedArray(markerLineColor)) {
+            inheritColorFromMarker = markerLineColor;
+        }
+    }
+
+    coerce('fillcolor', Color.addOpacity(
+        (traceOut.line || {}).color ||
+        inheritColorFromMarker ||
+        defaultColor, 0.5
+    ));
+};
+
+},{"../../components/color":378,"../../lib":506}],650:[function(_dereq_,module,exports){
+/**
+* Copyright 2012-2020, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+'use strict';
+
+var Axes = _dereq_('../../plots/cartesian/axes');
+
+module.exports = function formatLabels(cdi, trace, fullLayout) {
+    var labels = {};
+
+    var mockGd = {_fullLayout: fullLayout};
+    var xa = Axes.getFromTrace(mockGd, trace, 'x');
+    var ya = Axes.getFromTrace(mockGd, trace, 'y');
+
+    labels.xLabel = Axes.tickText(xa, cdi.x, true).text;
+    labels.yLabel = Axes.tickText(ya, cdi.y, true).text;
+
+    return labels;
+};
+
+},{"../../plots/cartesian/axes":552}],651:[function(_dereq_,module,exports){
+/**
+* Copyright 2012-2020, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+
+'use strict';
+
+var Color = _dereq_('../../components/color');
+var subtypes = _dereq_('./subtypes');
+
+
+module.exports = function getTraceColor(trace, di) {
+    var lc, tc;
+
+    // TODO: text modes
+
+    if(trace.mode === 'lines') {
+        lc = trace.line.color;
+        return (lc && Color.opacity(lc)) ?
+            lc : trace.fillcolor;
+    } else if(trace.mode === 'none') {
+        return trace.fill ? trace.fillcolor : '';
+    } else {
+        var mc = di.mcc || (trace.marker || {}).color;
+        var mlc = di.mlcc || ((trace.marker || {}).line || {}).color;
+
+        tc = (mc && Color.opacity(mc)) ? mc :
+            (mlc && Color.opacity(mlc) &&
+                (di.mlw || ((trace.marker || {}).line || {}).width)) ? mlc : '';
+
+        if(tc) {
+            // make sure the points aren't TOO transparent
+            if(Color.opacity(tc) < 0.3) {
+                return Color.addOpacity(tc, 0.3);
+            } else return tc;
+        } else {
+            lc = (trace.line || {}).color;
+            return (lc && Color.opacity(lc) &&
+                subtypes.hasLines(trace) && trace.line.width) ?
+                    lc : trace.fillcolor;
+        }
+    }
+};
+
+},{"../../components/color":378,"./subtypes":665}],652:[function(_dereq_,module,exports){
+/**
+* Copyright 2012-2020, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+'use strict';
+
+var Lib = _dereq_('../../lib');
+var Fx = _dereq_('../../components/fx');
+var Registry = _dereq_('../../registry');
+var getTraceColor = _dereq_('./get_trace_color');
+var Color = _dereq_('../../components/color');
+var fillText = Lib.fillText;
+
+module.exports = function hoverPoints(pointData, xval, yval, hovermode) {
+    var cd = pointData.cd;
+    var trace = cd[0].trace;
+    var xa = pointData.xa;
+    var ya = pointData.ya;
+    var xpx = xa.c2p(xval);
+    var ypx = ya.c2p(yval);
+    var pt = [xpx, ypx];
+    var hoveron = trace.hoveron || '';
+    var minRad = (trace.mode.indexOf('markers') !== -1) ? 3 : 0.5;
+
+    // look for points to hover on first, then take fills only if we
+    // didn't find a point
+    if(hoveron.indexOf('points') !== -1) {
+        var dx = function(di) {
+            // dx and dy are used in compare modes - here we want to always
+            // prioritize the closest data point, at least as long as markers are
+            // the same size or nonexistent, but still try to prioritize small markers too.
+            var rad = Math.max(3, di.mrc || 0);
+            var kink = 1 - 1 / rad;
+            var dxRaw = Math.abs(xa.c2p(di.x) - xpx);
+            var d = (dxRaw < rad) ? (kink * dxRaw / rad) : (dxRaw - rad + kink);
+            return d;
+        };
+        var dy = function(di) {
+            var rad = Math.max(3, di.mrc || 0);
+            var kink = 1 - 1 / rad;
+            var dyRaw = Math.abs(ya.c2p(di.y) - ypx);
+            return (dyRaw < rad) ? (kink * dyRaw / rad) : (dyRaw - rad + kink);
+        };
+        var dxy = function(di) {
+            // scatter points: d.mrc is the calculated marker radius
+            // adjust the distance so if you're inside the marker it
+            // always will show up regardless of point size, but
+            // prioritize smaller points
+            var rad = Math.max(minRad, di.mrc || 0);
+            var dx = xa.c2p(di.x) - xpx;
+            var dy = ya.c2p(di.y) - ypx;
+            return Math.max(Math.sqrt(dx * dx + dy * dy) - rad, 1 - minRad / rad);
+        };
+        var distfn = Fx.getDistanceFunction(hovermode, dx, dy, dxy);
+
+        Fx.getClosest(cd, distfn, pointData);
+
+        // skip the rest (for this trace) if we didn't find a close point
+        if(pointData.index !== false) {
+            // the closest data point
+            var di = cd[pointData.index];
+            var xc = xa.c2p(di.x, true);
+            var yc = ya.c2p(di.y, true);
+            var rad = di.mrc || 1;
+
+            // now we're done using the whole `calcdata` array, replace the
+            // index with the original index (in case of inserted point from
+            // stacked area)
+            pointData.index = di.i;
+
+            var orientation = cd[0].t.orientation;
+            // TODO: for scatter and bar, option to show (sub)totals and
+            // raw data? Currently stacked and/or normalized bars just show
+            // the normalized individual sizes, so that's what I'm doing here
+            // for now.
+            var sizeVal = orientation && (di.sNorm || di.s);
+            var xLabelVal = (orientation === 'h') ? sizeVal : di.x;
+            var yLabelVal = (orientation === 'v') ? sizeVal : di.y;
+
+            Lib.extendFlat(pointData, {
+                color: getTraceColor(trace, di),
+
+                x0: xc - rad,
+                x1: xc + rad,
+                xLabelVal: xLabelVal,
+
+                y0: yc - rad,
+                y1: yc + rad,
+                yLabelVal: yLabelVal,
+
+                spikeDistance: dxy(di),
+                hovertemplate: trace.hovertemplate
+            });
+
+            fillText(di, trace, pointData);
+            Registry.getComponentMethod('errorbars', 'hoverInfo')(di, trace, pointData);
+
+            return [pointData];
+        }
+    }
+
+    // even if hoveron is 'fills', only use it if we have polygons too
+    if(hoveron.indexOf('fills') !== -1 && trace._polygons) {
+        var polygons = trace._polygons;
+        var polygonsIn = [];
+        var inside = false;
+        var xmin = Infinity;
+        var xmax = -Infinity;
+        var ymin = Infinity;
+        var ymax = -Infinity;
+
+        var i, j, polygon, pts, xCross, x0, x1, y0, y1;
+
+        for(i = 0; i < polygons.length; i++) {
+            polygon = polygons[i];
+            // TODO: this is not going to work right for curved edges, it will
+            // act as though they're straight. That's probably going to need
+            // the elements themselves to capture the events. Worth it?
+            if(polygon.contains(pt)) {
+                inside = !inside;
+                // TODO: need better than just the overall bounding box
+                polygonsIn.push(polygon);
+                ymin = Math.min(ymin, polygon.ymin);
+                ymax = Math.max(ymax, polygon.ymax);
+            }
+        }
+
+        if(inside) {
+            // constrain ymin/max to the visible plot, so the label goes
+            // at the middle of the piece you can see
+            ymin = Math.max(ymin, 0);
+            ymax = Math.min(ymax, ya._length);
+
+            // find the overall left-most and right-most points of the
+            // polygon(s) we're inside at their combined vertical midpoint.
+            // This is where we will draw the hover label.
+            // Note that this might not be the vertical midpoint of the
+            // whole trace, if it's disjoint.
+            var yAvg = (ymin + ymax) / 2;
+            for(i = 0; i < polygonsIn.length; i++) {
+                pts = polygonsIn[i].pts;
+                for(j = 1; j < pts.length; j++) {
+                    y0 = pts[j - 1][1];
+                    y1 = pts[j][1];
+                    if((y0 > yAvg) !== (y1 >= yAvg)) {
+                        x0 = pts[j - 1][0];
+                        x1 = pts[j][0];
+                        if(y1 - y0) {
+                            xCross = x0 + (x1 - x0) * (yAvg - y0) / (y1 - y0);
+                            xmin = Math.min(xmin, xCross);
+                            xmax = Math.max(xmax, xCross);
+                        }
+                    }
+                }
+            }
+
+            // constrain xmin/max to the visible plot now too
+            xmin = Math.max(xmin, 0);
+            xmax = Math.min(xmax, xa._length);
+
+            // get only fill or line color for the hover color
+            var color = Color.defaultLine;
+            if(Color.opacity(trace.fillcolor)) color = trace.fillcolor;
+            else if(Color.opacity((trace.line || {}).color)) {
+                color = trace.line.color;
+            }
+
+            Lib.extendFlat(pointData, {
+                // never let a 2D override 1D type as closest point
+                // also: no spikeDistance, it's not allowed for fills
+                distance: pointData.maxHoverDistance,
+                x0: xmin,
+                x1: xmax,
+                y0: yAvg,
+                y1: yAvg,
+                color: color,
+                hovertemplate: false
+            });
+
+            delete pointData.index;
+
+            if(trace.text && !Array.isArray(trace.text)) {
+                pointData.text = String(trace.text);
+            } else pointData.text = trace.name;
+
+            return [pointData];
+        }
+    }
+};
+
+},{"../../components/color":378,"../../components/fx":418,"../../lib":506,"../../registry":606,"./get_trace_color":651}],653:[function(_dereq_,module,exports){
+/**
+* Copyright 2012-2020, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+'use strict';
+
+var subtypes = _dereq_('./subtypes');
+
+module.exports = {
+    hasLines: subtypes.hasLines,
+    hasMarkers: subtypes.hasMarkers,
+    hasText: subtypes.hasText,
+    isBubble: subtypes.isBubble,
+
+    attributes: _dereq_('./attributes'),
+    supplyDefaults: _dereq_('./defaults'),
+    crossTraceDefaults: _dereq_('./cross_trace_defaults'),
+    calc: _dereq_('./calc').calc,
+    crossTraceCalc: _dereq_('./cross_trace_calc'),
+    arraysToCalcdata: _dereq_('./arrays_to_calcdata'),
+    plot: _dereq_('./plot'),
+    colorbar: _dereq_('./marker_colorbar'),
+    formatLabels: _dereq_('./format_labels'),
+    style: _dereq_('./style').style,
+    styleOnSelect: _dereq_('./style').styleOnSelect,
+    hoverPoints: _dereq_('./hover'),
+    selectPoints: _dereq_('./select'),
+    animatable: true,
+
+    moduleType: 'trace',
+    name: 'scatter',
+    basePlotModule: _dereq_('../../plots/cartesian'),
+    categories: [
+        'cartesian', 'svg', 'symbols', 'errorBarsOK', 'showLegend', 'scatter-like',
+        'zoomScale'
+    ],
+    meta: {
+        
+    }
+};
+
+},{"../../plots/cartesian":565,"./arrays_to_calcdata":640,"./attributes":641,"./calc":642,"./cross_trace_calc":646,"./cross_trace_defaults":647,"./defaults":648,"./format_labels":650,"./hover":652,"./marker_colorbar":659,"./plot":661,"./select":662,"./style":664,"./subtypes":665}],654:[function(_dereq_,module,exports){
+/**
+* Copyright 2012-2020, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+'use strict';
+
+var isArrayOrTypedArray = _dereq_('../../lib').isArrayOrTypedArray;
+var hasColorscale = _dereq_('../../components/colorscale/helpers').hasColorscale;
+var colorscaleDefaults = _dereq_('../../components/colorscale/defaults');
+
+module.exports = function lineDefaults(traceIn, traceOut, defaultColor, layout, coerce, opts) {
+    var markerColor = (traceIn.marker || {}).color;
+
+    coerce('line.color', defaultColor);
+
+    if(hasColorscale(traceIn, 'line')) {
+        colorscaleDefaults(traceIn, traceOut, layout, coerce, {prefix: 'line.', cLetter: 'c'});
+    } else {
+        var lineColorDflt = (isArrayOrTypedArray(markerColor) ? false : markerColor) || defaultColor;
+        coerce('line.color', lineColorDflt);
+    }
+
+    coerce('line.width');
+    if(!(opts || {}).noDash) coerce('line.dash');
+};
+
+},{"../../components/colorscale/defaults":388,"../../components/colorscale/helpers":389,"../../lib":506}],655:[function(_dereq_,module,exports){
+/**
+* Copyright 2012-2020, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+
+'use strict';
+
+var numConstants = _dereq_('../../constants/numerical');
+var BADNUM = numConstants.BADNUM;
+var LOG_CLIP = numConstants.LOG_CLIP;
+var LOG_CLIP_PLUS = LOG_CLIP + 0.5;
+var LOG_CLIP_MINUS = LOG_CLIP - 0.5;
+var Lib = _dereq_('../../lib');
+var segmentsIntersect = Lib.segmentsIntersect;
+var constrain = Lib.constrain;
+var constants = _dereq_('./constants');
+
+
+module.exports = function linePoints(d, opts) {
+    var xa = opts.xaxis;
+    var ya = opts.yaxis;
+    var xLog = xa.type === 'log';
+    var yLog = ya.type === 'log';
+    var xLen = xa._length;
+    var yLen = ya._length;
+    var connectGaps = opts.connectGaps;
+    var baseTolerance = opts.baseTolerance;
+    var shape = opts.shape;
+    var linear = shape === 'linear';
+    var fill = opts.fill && opts.fill !== 'none';
+    var segments = [];
+    var minTolerance = constants.minTolerance;
+    var len = d.length;
+    var pts = new Array(len);
+    var pti = 0;
+
+    var i;
+
+    // pt variables are pixel coordinates [x,y] of one point
+    // these four are the outputs of clustering on a line
+    var clusterStartPt, clusterEndPt, clusterHighPt, clusterLowPt;
+
+    // "this" is the next point we're considering adding to the cluster
+    var thisPt;
+
+    // did we encounter the high point first, then a low point, or vice versa?
+    var clusterHighFirst;
+
+    // the first two points in the cluster determine its unit vector
+    // so the second is always in the "High" direction
+    var clusterUnitVector;
+
+    // the pixel delta from clusterStartPt
+    var thisVector;
+
+    // val variables are (signed) pixel distances along the cluster vector
+    var clusterRefDist, clusterHighVal, clusterLowVal, thisVal;
+
+    // deviation variables are (signed) pixel distances normal to the cluster vector
+    var clusterMinDeviation, clusterMaxDeviation, thisDeviation;
+
+    // turn one calcdata point into pixel coordinates
+    function getPt(index) {
+        var di = d[index];
+        if(!di) return false;
+        var x = opts.linearized ? xa.l2p(di.x) : xa.c2p(di.x);
+        var y = opts.linearized ? ya.l2p(di.y) : ya.c2p(di.y);
+
+        // if non-positive log values, set them VERY far off-screen
+        // so the line looks essentially straight from the previous point.
+        if(x === BADNUM) {
+            if(xLog) x = xa.c2p(di.x, true);
+            if(x === BADNUM) return false;
+            // If BOTH were bad log values, make the line follow a constant
+            // exponent rather than a constant slope
+            if(yLog && y === BADNUM) {
+                x *= Math.abs(xa._m * yLen * (xa._m > 0 ? LOG_CLIP_PLUS : LOG_CLIP_MINUS) /
+                    (ya._m * xLen * (ya._m > 0 ? LOG_CLIP_PLUS : LOG_CLIP_MINUS)));
+            }
+            x *= 1000;
+        }
+        if(y === BADNUM) {
+            if(yLog) y = ya.c2p(di.y, true);
+            if(y === BADNUM) return false;
+            y *= 1000;
+        }
+        return [x, y];
+    }
+
+    function crossesViewport(xFrac0, yFrac0, xFrac1, yFrac1) {
+        var dx = xFrac1 - xFrac0;
+        var dy = yFrac1 - yFrac0;
+        var dx0 = 0.5 - xFrac0;
+        var dy0 = 0.5 - yFrac0;
+        var norm2 = dx * dx + dy * dy;
+        var dot = dx * dx0 + dy * dy0;
+        if(dot > 0 && dot < norm2) {
+            var cross = dx0 * dy - dy0 * dx;
+            if(cross * cross < norm2) return true;
+        }
+    }
+
+    var latestXFrac, latestYFrac;
+    // if we're off-screen, increase tolerance over baseTolerance
+    function getTolerance(pt, nextPt) {
+        var xFrac = pt[0] / xLen;
+        var yFrac = pt[1] / yLen;
+        var offScreenFraction = Math.max(0, -xFrac, xFrac - 1, -yFrac, yFrac - 1);
+        if(offScreenFraction && (latestXFrac !== undefined) &&
+            crossesViewport(xFrac, yFrac, latestXFrac, latestYFrac)
+        ) {
+            offScreenFraction = 0;
+        }
+        if(offScreenFraction && nextPt &&
+            crossesViewport(xFrac, yFrac, nextPt[0] / xLen, nextPt[1] / yLen)
+        ) {
+            offScreenFraction = 0;
+        }
+
+        return (1 + constants.toleranceGrowth * offScreenFraction) * baseTolerance;
+    }
+
+    function ptDist(pt1, pt2) {
+        var dx = pt1[0] - pt2[0];
+        var dy = pt1[1] - pt2[1];
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    // last bit of filtering: clip paths that are VERY far off-screen
+    // so we don't get near the browser's hard limit (+/- 2^29 px in Chrome and FF)
+
+    var maxScreensAway = constants.maxScreensAway;
+
+    // find the intersections between the segment from pt1 to pt2
+    // and the large rectangle maxScreensAway around the viewport
+    // if one of pt1 and pt2 is inside and the other outside, there
+    // will be only one intersection.
+    // if both are outside there will be 0 or 2 intersections
+    // (or 1 if it's right at a corner - we'll treat that like 0)
+    // returns an array of intersection pts
+    var xEdge0 = -xLen * maxScreensAway;
+    var xEdge1 = xLen * (1 + maxScreensAway);
+    var yEdge0 = -yLen * maxScreensAway;
+    var yEdge1 = yLen * (1 + maxScreensAway);
+    var edges = [
+        [xEdge0, yEdge0, xEdge1, yEdge0],
+        [xEdge1, yEdge0, xEdge1, yEdge1],
+        [xEdge1, yEdge1, xEdge0, yEdge1],
+        [xEdge0, yEdge1, xEdge0, yEdge0]
+    ];
+    var xEdge, yEdge, lastXEdge, lastYEdge, lastFarPt, edgePt;
+
+    // for linear line shape, edge intersections should be linearly interpolated
+    // spline uses this too, which isn't precisely correct but is actually pretty
+    // good, because Catmull-Rom weights far-away points less in creating the curvature
+    function getLinearEdgeIntersections(pt1, pt2) {
+        var out = [];
+        var ptCount = 0;
+        for(var i = 0; i < 4; i++) {
+            var edge = edges[i];
+            var ptInt = segmentsIntersect(
+                pt1[0], pt1[1], pt2[0], pt2[1],
+                edge[0], edge[1], edge[2], edge[3]
+            );
+            if(ptInt && (!ptCount ||
+                Math.abs(ptInt.x - out[0][0]) > 1 ||
+                Math.abs(ptInt.y - out[0][1]) > 1
+            )) {
+                ptInt = [ptInt.x, ptInt.y];
+                // if we have 2 intersections, make sure the closest one to pt1 comes first
+                if(ptCount && ptDist(ptInt, pt1) < ptDist(out[0], pt1)) out.unshift(ptInt);
+                else out.push(ptInt);
+                ptCount++;
+            }
+        }
+        return out;
+    }
+
+    function onlyConstrainedPoint(pt) {
+        if(pt[0] < xEdge0 || pt[0] > xEdge1 || pt[1] < yEdge0 || pt[1] > yEdge1) {
+            return [constrain(pt[0], xEdge0, xEdge1), constrain(pt[1], yEdge0, yEdge1)];
+        }
+    }
+
+    function sameEdge(pt1, pt2) {
+        if(pt1[0] === pt2[0] && (pt1[0] === xEdge0 || pt1[0] === xEdge1)) return true;
+        if(pt1[1] === pt2[1] && (pt1[1] === yEdge0 || pt1[1] === yEdge1)) return true;
+    }
+
+    // for line shapes hv and vh, movement in the two dimensions is decoupled,
+    // so all we need to do is constrain each dimension independently
+    function getHVEdgeIntersections(pt1, pt2) {
+        var out = [];
+        var ptInt1 = onlyConstrainedPoint(pt1);
+        var ptInt2 = onlyConstrainedPoint(pt2);
+        if(ptInt1 && ptInt2 && sameEdge(ptInt1, ptInt2)) return out;
+
+        if(ptInt1) out.push(ptInt1);
+        if(ptInt2) out.push(ptInt2);
+        return out;
+    }
+
+    // hvh and vhv we sometimes have to move one of the intersection points
+    // out BEYOND the clipping rect, by a maximum of a factor of 2, so that
+    // the midpoint line is drawn in the right place
+    function getABAEdgeIntersections(dim, limit0, limit1) {
+        return function(pt1, pt2) {
+            var ptInt1 = onlyConstrainedPoint(pt1);
+            var ptInt2 = onlyConstrainedPoint(pt2);
+
+            var out = [];
+            if(ptInt1 && ptInt2 && sameEdge(ptInt1, ptInt2)) return out;
+
+            if(ptInt1) out.push(ptInt1);
+            if(ptInt2) out.push(ptInt2);
+
+            var midShift = 2 * Lib.constrain((pt1[dim] + pt2[dim]) / 2, limit0, limit1) -
+                ((ptInt1 || pt1)[dim] + (ptInt2 || pt2)[dim]);
+            if(midShift) {
+                var ptToAlter;
+                if(ptInt1 && ptInt2) {
+                    ptToAlter = (midShift > 0 === ptInt1[dim] > ptInt2[dim]) ? ptInt1 : ptInt2;
+                } else ptToAlter = ptInt1 || ptInt2;
+
+                ptToAlter[dim] += midShift;
+            }
+
+            return out;
+        };
+    }
+
+    var getEdgeIntersections;
+    if(shape === 'linear' || shape === 'spline') {
+        getEdgeIntersections = getLinearEdgeIntersections;
+    } else if(shape === 'hv' || shape === 'vh') {
+        getEdgeIntersections = getHVEdgeIntersections;
+    } else if(shape === 'hvh') getEdgeIntersections = getABAEdgeIntersections(0, xEdge0, xEdge1);
+    else if(shape === 'vhv') getEdgeIntersections = getABAEdgeIntersections(1, yEdge0, yEdge1);
+
+    // a segment pt1->pt2 entirely outside the nearby region:
+    // find the corner it gets closest to touching
+    function getClosestCorner(pt1, pt2) {
+        var dx = pt2[0] - pt1[0];
+        var m = (pt2[1] - pt1[1]) / dx;
+        var b = (pt1[1] * pt2[0] - pt2[1] * pt1[0]) / dx;
+
+        if(b > 0) return [m > 0 ? xEdge0 : xEdge1, yEdge1];
+        else return [m > 0 ? xEdge1 : xEdge0, yEdge0];
+    }
+
+    function updateEdge(pt) {
+        var x = pt[0];
+        var y = pt[1];
+        var xSame = x === pts[pti - 1][0];
+        var ySame = y === pts[pti - 1][1];
+        // duplicate point?
+        if(xSame && ySame) return;
+        if(pti > 1) {
+            // backtracking along an edge?
+            var xSame2 = x === pts[pti - 2][0];
+            var ySame2 = y === pts[pti - 2][1];
+            if(xSame && (x === xEdge0 || x === xEdge1) && xSame2) {
+                if(ySame2) pti--; // backtracking exactly - drop prev pt and don't add
+                else pts[pti - 1] = pt; // not exact: replace the prev pt
+            } else if(ySame && (y === yEdge0 || y === yEdge1) && ySame2) {
+                if(xSame2) pti--;
+                else pts[pti - 1] = pt;
+            } else pts[pti++] = pt;
+        } else pts[pti++] = pt;
+    }
+
+    function updateEdgesForReentry(pt) {
+        // if we're outside the nearby region and going back in,
+        // we may need to loop around a corner point
+        if(pts[pti - 1][0] !== pt[0] && pts[pti - 1][1] !== pt[1]) {
+            updateEdge([lastXEdge, lastYEdge]);
+        }
+        updateEdge(pt);
+        lastFarPt = null;
+        lastXEdge = lastYEdge = 0;
+    }
+
+    function addPt(pt) {
+        latestXFrac = pt[0] / xLen;
+        latestYFrac = pt[1] / yLen;
+        // Are we more than maxScreensAway off-screen any direction?
+        // if so, clip to this box, but in such a way that on-screen
+        // drawing is unchanged
+        xEdge = (pt[0] < xEdge0) ? xEdge0 : (pt[0] > xEdge1) ? xEdge1 : 0;
+        yEdge = (pt[1] < yEdge0) ? yEdge0 : (pt[1] > yEdge1) ? yEdge1 : 0;
+        if(xEdge || yEdge) {
+            if(!pti) {
+                // to get fills right - if first point is far, push it toward the
+                // screen in whichever direction(s) are far
+
+                pts[pti++] = [xEdge || pt[0], yEdge || pt[1]];
+            } else if(lastFarPt) {
+                // both this point and the last are outside the nearby region
+                // check if we're crossing the nearby region
+                var intersections = getEdgeIntersections(lastFarPt, pt);
+                if(intersections.length > 1) {
+                    updateEdgesForReentry(intersections[0]);
+                    pts[pti++] = intersections[1];
+                }
+            } else {
+                // we're leaving the nearby region - add the point where we left it
+
+                edgePt = getEdgeIntersections(pts[pti - 1], pt)[0];
+                pts[pti++] = edgePt;
+            }
+
+            var lastPt = pts[pti - 1];
+            if(xEdge && yEdge && (lastPt[0] !== xEdge || lastPt[1] !== yEdge)) {
+                // we've gone out beyond a new corner: add the corner too
+                // so that the next point will take the right winding
+                if(lastFarPt) {
+                    if(lastXEdge !== xEdge && lastYEdge !== yEdge) {
+                        if(lastXEdge && lastYEdge) {
+                            // we've gone around to an opposite corner - we
+                            // need to add the correct extra corner
+                            // in order to get the right winding
+                            updateEdge(getClosestCorner(lastFarPt, pt));
+                        } else {
+                            // we're coming from a far edge - the extra corner
+                            // we need is determined uniquely by the sectors
+                            updateEdge([lastXEdge || xEdge, lastYEdge || yEdge]);
+                        }
+                    } else if(lastXEdge && lastYEdge) {
+                        updateEdge([lastXEdge, lastYEdge]);
+                    }
+                }
+                updateEdge([xEdge, yEdge]);
+            } else if((lastXEdge - xEdge) && (lastYEdge - yEdge)) {
+                // we're coming from an edge or far corner to an edge - again the
+                // extra corner we need is uniquely determined by the sectors
+                updateEdge([xEdge || lastXEdge, yEdge || lastYEdge]);
+            }
+            lastFarPt = pt;
+            lastXEdge = xEdge;
+            lastYEdge = yEdge;
+        } else {
+            if(lastFarPt) {
+                // this point is in range but the previous wasn't: add its entry pt first
+                updateEdgesForReentry(getEdgeIntersections(lastFarPt, pt)[0]);
+            }
+
+            pts[pti++] = pt;
+        }
+    }
+
+    // loop over ALL points in this trace
+    for(i = 0; i < len; i++) {
+        clusterStartPt = getPt(i);
+        if(!clusterStartPt) continue;
+
+        pti = 0;
+        lastFarPt = null;
+        addPt(clusterStartPt);
+
+        // loop over one segment of the trace
+        for(i++; i < len; i++) {
+            clusterHighPt = getPt(i);
+            if(!clusterHighPt) {
+                if(connectGaps) continue;
+                else break;
+            }
+
+            // can't decimate if nonlinear line shape
+            // TODO: we *could* decimate [hv]{2,3} shapes if we restricted clusters to horz or vert again
+            // but spline would be verrry awkward to decimate
+            if(!linear || !opts.simplify) {
+                addPt(clusterHighPt);
+                continue;
+            }
+
+            var nextPt = getPt(i + 1);
+
+            clusterRefDist = ptDist(clusterHighPt, clusterStartPt);
+
+            // #3147 - always include the very first and last points for fills
+            if(!(fill && (pti === 0 || pti === len - 1)) &&
+                clusterRefDist < getTolerance(clusterHighPt, nextPt) * minTolerance) continue;
+
+            clusterUnitVector = [
+                (clusterHighPt[0] - clusterStartPt[0]) / clusterRefDist,
+                (clusterHighPt[1] - clusterStartPt[1]) / clusterRefDist
+            ];
+
+            clusterLowPt = clusterStartPt;
+            clusterHighVal = clusterRefDist;
+            clusterLowVal = clusterMinDeviation = clusterMaxDeviation = 0;
+            clusterHighFirst = false;
+            clusterEndPt = clusterHighPt;
+
+            // loop over one cluster of points that collapse onto one line
+            for(i++; i < d.length; i++) {
+                thisPt = nextPt;
+                nextPt = getPt(i + 1);
+                if(!thisPt) {
+                    if(connectGaps) continue;
+                    else break;
+                }
+                thisVector = [
+                    thisPt[0] - clusterStartPt[0],
+                    thisPt[1] - clusterStartPt[1]
+                ];
+                // cross product (or dot with normal to the cluster vector)
+                thisDeviation = thisVector[0] * clusterUnitVector[1] - thisVector[1] * clusterUnitVector[0];
+                clusterMinDeviation = Math.min(clusterMinDeviation, thisDeviation);
+                clusterMaxDeviation = Math.max(clusterMaxDeviation, thisDeviation);
+
+                if(clusterMaxDeviation - clusterMinDeviation > getTolerance(thisPt, nextPt)) break;
+
+                clusterEndPt = thisPt;
+                thisVal = thisVector[0] * clusterUnitVector[0] + thisVector[1] * clusterUnitVector[1];
+
+                if(thisVal > clusterHighVal) {
+                    clusterHighVal = thisVal;
+                    clusterHighPt = thisPt;
+                    clusterHighFirst = false;
+                } else if(thisVal < clusterLowVal) {
+                    clusterLowVal = thisVal;
+                    clusterLowPt = thisPt;
+                    clusterHighFirst = true;
+                }
+            }
+
+            // insert this cluster into pts
+            // we've already inserted the start pt, now check if we have high and low pts
+            if(clusterHighFirst) {
+                addPt(clusterHighPt);
+                if(clusterEndPt !== clusterLowPt) addPt(clusterLowPt);
+            } else {
+                if(clusterLowPt !== clusterStartPt) addPt(clusterLowPt);
+                if(clusterEndPt !== clusterHighPt) addPt(clusterHighPt);
+            }
+            // and finally insert the end pt
+            addPt(clusterEndPt);
+
+            // have we reached the end of this segment?
+            if(i >= d.length || !thisPt) break;
+
+            // otherwise we have an out-of-cluster point to insert as next clusterStartPt
+            addPt(thisPt);
+            clusterStartPt = thisPt;
+        }
+
+        // to get fills right - repeat what we did at the start
+        if(lastFarPt) updateEdge([lastXEdge || lastFarPt[0], lastYEdge || lastFarPt[1]]);
+
+        segments.push(pts.slice(0, pti));
+    }
+
+    return segments;
+};
+
+},{"../../constants/numerical":485,"../../lib":506,"./constants":645}],656:[function(_dereq_,module,exports){
+/**
+* Copyright 2012-2020, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+
+'use strict';
+
+
+// common to 'scatter' and 'scatterternary'
+module.exports = function handleLineShapeDefaults(traceIn, traceOut, coerce) {
+    var shape = coerce('line.shape');
+    if(shape === 'spline') coerce('line.smoothing');
+};
+
+},{}],657:[function(_dereq_,module,exports){
+/**
+* Copyright 2012-2020, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+'use strict';
+
+var LINKEDFILLS = {tonextx: 1, tonexty: 1, tonext: 1};
+
+module.exports = function linkTraces(gd, plotinfo, cdscatter) {
+    var trace, i, group, prevtrace, groupIndex;
+
+    // first sort traces to keep stacks & filled-together groups together
+    var groupIndices = {};
+    var needsSort = false;
+    var prevGroupIndex = -1;
+    var nextGroupIndex = 0;
+    var prevUnstackedGroupIndex = -1;
+    for(i = 0; i < cdscatter.length; i++) {
+        trace = cdscatter[i][0].trace;
+        group = trace.stackgroup || '';
+        if(group) {
+            if(group in groupIndices) {
+                groupIndex = groupIndices[group];
+            } else {
+                groupIndex = groupIndices[group] = nextGroupIndex;
+                nextGroupIndex++;
+            }
+        } else if(trace.fill in LINKEDFILLS && prevUnstackedGroupIndex >= 0) {
+            groupIndex = prevUnstackedGroupIndex;
+        } else {
+            groupIndex = prevUnstackedGroupIndex = nextGroupIndex;
+            nextGroupIndex++;
+        }
+
+        if(groupIndex < prevGroupIndex) needsSort = true;
+        trace._groupIndex = prevGroupIndex = groupIndex;
+    }
+
+    var cdscatterSorted = cdscatter.slice();
+    if(needsSort) {
+        cdscatterSorted.sort(function(a, b) {
+            var traceA = a[0].trace;
+            var traceB = b[0].trace;
+            return (traceA._groupIndex - traceB._groupIndex) ||
+                (traceA.index - traceB.index);
+        });
+    }
+
+    // now link traces to each other
+    var prevtraces = {};
+    for(i = 0; i < cdscatterSorted.length; i++) {
+        trace = cdscatterSorted[i][0].trace;
+        group = trace.stackgroup || '';
+
+        // Note: The check which ensures all cdscatter here are for the same axis and
+        // are either cartesian or scatterternary has been removed. This code assumes
+        // the passed scattertraces have been filtered to the proper plot types and
+        // the proper subplots.
+        if(trace.visible === true) {
+            trace._nexttrace = null;
+
+            if(trace.fill in LINKEDFILLS) {
+                prevtrace = prevtraces[group];
+                trace._prevtrace = prevtrace || null;
+
+                if(prevtrace) {
+                    prevtrace._nexttrace = trace;
+                }
+            }
+
+            trace._ownfill = (trace.fill && (
+                trace.fill.substr(0, 6) === 'tozero' ||
+                trace.fill === 'toself' ||
+                (trace.fill.substr(0, 2) === 'to' && !trace._prevtrace)
+            ));
+
+            prevtraces[group] = trace;
+        } else {
+            trace._prevtrace = trace._nexttrace = trace._ownfill = null;
+        }
+    }
+
+    return cdscatterSorted;
+};
+
+},{}],658:[function(_dereq_,module,exports){
+/**
+* Copyright 2012-2020, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+
+'use strict';
+
+var isNumeric = _dereq_('fast-isnumeric');
+
+
+// used in the drawing step for 'scatter' and 'scattegeo' and
+// in the convert step for 'scatter3d'
+module.exports = function makeBubbleSizeFn(trace) {
+    var marker = trace.marker;
+    var sizeRef = marker.sizeref || 1;
+    var sizeMin = marker.sizemin || 0;
+
+    // for bubble charts, allow scaling the provided value linearly
+    // and by area or diameter.
+    // Note this only applies to the array-value sizes
+
+    var baseFn = (marker.sizemode === 'area') ?
+        function(v) { return Math.sqrt(v / sizeRef); } :
+        function(v) { return v / sizeRef; };
+
+    // TODO add support for position/negative bubbles?
+    // TODO add 'sizeoffset' attribute?
+    return function(v) {
+        var baseSize = baseFn(v / 2);
+
+        // don't show non-numeric and negative sizes
+        return (isNumeric(baseSize) && (baseSize > 0)) ?
+            Math.max(baseSize, sizeMin) :
+            0;
+    };
+};
+
+},{"fast-isnumeric":90}],659:[function(_dereq_,module,exports){
+/**
+* Copyright 2012-2020, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+
+'use strict';
+
+module.exports = {
+    container: 'marker',
+    min: 'cmin',
+    max: 'cmax'
+};
+
+},{}],660:[function(_dereq_,module,exports){
+/**
+* Copyright 2012-2020, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+'use strict';
+
+var Color = _dereq_('../../components/color');
+var hasColorscale = _dereq_('../../components/colorscale/helpers').hasColorscale;
+var colorscaleDefaults = _dereq_('../../components/colorscale/defaults');
+
+var subTypes = _dereq_('./subtypes');
+
+/*
+ * opts: object of flags to control features not all marker users support
+ *   noLine: caller does not support marker lines
+ *   gradient: caller supports gradients
+ *   noSelect: caller does not support selected/unselected attribute containers
+ */
+module.exports = function markerDefaults(traceIn, traceOut, defaultColor, layout, coerce, opts) {
+    var isBubble = subTypes.isBubble(traceIn);
+    var lineColor = (traceIn.line || {}).color;
+    var defaultMLC;
+
+    opts = opts || {};
+
+    // marker.color inherit from line.color (even if line.color is an array)
+    if(lineColor) defaultColor = lineColor;
+
+    coerce('marker.symbol');
+    coerce('marker.opacity', isBubble ? 0.7 : 1);
+    coerce('marker.size');
+
+    coerce('marker.color', defaultColor);
+    if(hasColorscale(traceIn, 'marker')) {
+        colorscaleDefaults(traceIn, traceOut, layout, coerce, {prefix: 'marker.', cLetter: 'c'});
+    }
+
+    if(!opts.noSelect) {
+        coerce('selected.marker.color');
+        coerce('unselected.marker.color');
+        coerce('selected.marker.size');
+        coerce('unselected.marker.size');
+    }
+
+    if(!opts.noLine) {
+        // if there's a line with a different color than the marker, use
+        // that line color as the default marker line color
+        // (except when it's an array)
+        // mostly this is for transparent markers to behave nicely
+        if(lineColor && !Array.isArray(lineColor) && (traceOut.marker.color !== lineColor)) {
+            defaultMLC = lineColor;
+        } else if(isBubble) defaultMLC = Color.background;
+        else defaultMLC = Color.defaultLine;
+
+        coerce('marker.line.color', defaultMLC);
+        if(hasColorscale(traceIn, 'marker.line')) {
+            colorscaleDefaults(traceIn, traceOut, layout, coerce, {prefix: 'marker.line.', cLetter: 'c'});
+        }
+
+        coerce('marker.line.width', isBubble ? 1 : 0);
+    }
+
+    if(isBubble) {
+        coerce('marker.sizeref');
+        coerce('marker.sizemin');
+        coerce('marker.sizemode');
+    }
+
+    if(opts.gradient) {
+        var gradientType = coerce('marker.gradient.type');
+        if(gradientType !== 'none') {
+            coerce('marker.gradient.color');
+        }
+    }
+};
+
+},{"../../components/color":378,"../../components/colorscale/defaults":388,"../../components/colorscale/helpers":389,"./subtypes":665}],661:[function(_dereq_,module,exports){
+/**
+* Copyright 2012-2020, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+
+'use strict';
+
+var d3 = _dereq_('d3');
+
+var Registry = _dereq_('../../registry');
+var Lib = _dereq_('../../lib');
+var ensureSingle = Lib.ensureSingle;
+var identity = Lib.identity;
+var Drawing = _dereq_('../../components/drawing');
+
+var subTypes = _dereq_('./subtypes');
+var linePoints = _dereq_('./line_points');
+var linkTraces = _dereq_('./link_traces');
+var polygonTester = _dereq_('../../lib/polygon').tester;
+
+module.exports = function plot(gd, plotinfo, cdscatter, scatterLayer, transitionOpts, makeOnCompleteCallback) {
+    var join, onComplete;
+
+    // If transition config is provided, then it is only a partial replot and traces not
+    // updated are removed.
+    var isFullReplot = !transitionOpts;
+    var hasTransition = !!transitionOpts && transitionOpts.duration > 0;
+
+    // Link traces so the z-order of fill layers is correct
+    var cdscatterSorted = linkTraces(gd, plotinfo, cdscatter);
+
+    join = scatterLayer.selectAll('g.trace')
+        .data(cdscatterSorted, function(d) { return d[0].trace.uid; });
+
+    // Append new traces:
+    join.enter().append('g')
+        .attr('class', function(d) {
+            return 'trace scatter trace' + d[0].trace.uid;
+        })
+        .style('stroke-miterlimit', 2);
+    join.order();
+
+    createFills(gd, join, plotinfo);
+
+    if(hasTransition) {
+        if(makeOnCompleteCallback) {
+            // If it was passed a callback to register completion, make a callback. If
+            // this is created, then it must be executed on completion, otherwise the
+            // pos-transition redraw will not execute:
+            onComplete = makeOnCompleteCallback();
+        }
+
+        var transition = d3.transition()
+            .duration(transitionOpts.duration)
+            .ease(transitionOpts.easing)
+            .each('end', function() {
+                onComplete && onComplete();
+            })
+            .each('interrupt', function() {
+                onComplete && onComplete();
+            });
+
+        transition.each(function() {
+            // Must run the selection again since otherwise enters/updates get grouped together
+            // and these get executed out of order. Except we need them in order!
+            scatterLayer.selectAll('g.trace').each(function(d, i) {
+                plotOne(gd, i, plotinfo, d, cdscatterSorted, this, transitionOpts);
+            });
+        });
+    } else {
+        join.each(function(d, i) {
+            plotOne(gd, i, plotinfo, d, cdscatterSorted, this, transitionOpts);
+        });
+    }
+
+    if(isFullReplot) {
+        join.exit().remove();
+    }
+
+    // remove paths that didn't get used
+    scatterLayer.selectAll('path:not([d])').remove();
+};
+
+function createFills(gd, traceJoin, plotinfo) {
+    traceJoin.each(function(d) {
+        var fills = ensureSingle(d3.select(this), 'g', 'fills');
+        Drawing.setClipUrl(fills, plotinfo.layerClipId, gd);
+
+        var trace = d[0].trace;
+
+        var fillData = [];
+        if(trace._ownfill) fillData.push('_ownFill');
+        if(trace._nexttrace) fillData.push('_nextFill');
+
+        var fillJoin = fills.selectAll('g').data(fillData, identity);
+
+        fillJoin.enter().append('g');
+
+        fillJoin.exit()
+            .each(function(d) { trace[d] = null; })
+            .remove();
+
+        fillJoin.order().each(function(d) {
+            // make a path element inside the fill group, just so
+            // we can give it its own data later on and the group can
+            // keep its simple '_*Fill' data
+            trace[d] = ensureSingle(d3.select(this), 'path', 'js-fill');
+        });
+    });
+}
+
+function plotOne(gd, idx, plotinfo, cdscatter, cdscatterAll, element, transitionOpts) {
+    var i;
+
+    // Since this has been reorganized and we're executing this on individual traces,
+    // we need to pass it the full list of cdscatter as well as this trace's index (idx)
+    // since it does an internal n^2 loop over comparisons with other traces:
+    selectMarkers(gd, idx, plotinfo, cdscatter, cdscatterAll);
+
+    var hasTransition = !!transitionOpts && transitionOpts.duration > 0;
+
+    function transition(selection) {
+        return hasTransition ? selection.transition() : selection;
+    }
+
+    var xa = plotinfo.xaxis;
+    var ya = plotinfo.yaxis;
+
+    var trace = cdscatter[0].trace;
+    var line = trace.line;
+    var tr = d3.select(element);
+
+    var errorBarGroup = ensureSingle(tr, 'g', 'errorbars');
+    var lines = ensureSingle(tr, 'g', 'lines');
+    var points = ensureSingle(tr, 'g', 'points');
+    var text = ensureSingle(tr, 'g', 'text');
+
+    // error bars are at the bottom
+    Registry.getComponentMethod('errorbars', 'plot')(gd, errorBarGroup, plotinfo, transitionOpts);
+
+    if(trace.visible !== true) return;
+
+    transition(tr).style('opacity', trace.opacity);
+
+    // BUILD LINES AND FILLS
+    var ownFillEl3, tonext;
+    var ownFillDir = trace.fill.charAt(trace.fill.length - 1);
+    if(ownFillDir !== 'x' && ownFillDir !== 'y') ownFillDir = '';
+
+    // store node for tweaking by selectPoints
+    cdscatter[0][plotinfo.isRangePlot ? 'nodeRangePlot3' : 'node3'] = tr;
+
+    var prevRevpath = '';
+    var prevPolygons = [];
+    var prevtrace = trace._prevtrace;
+
+    if(prevtrace) {
+        prevRevpath = prevtrace._prevRevpath || '';
+        tonext = prevtrace._nextFill;
+        prevPolygons = prevtrace._polygons;
+    }
+
+    var thispath;
+    var thisrevpath;
+    // fullpath is all paths for this curve, joined together straight
+    // across gaps, for filling
+    var fullpath = '';
+    // revpath is fullpath reversed, for fill-to-next
+    var revpath = '';
+    // functions for converting a point array to a path
+    var pathfn, revpathbase, revpathfn;
+    // variables used before and after the data join
+    var pt0, lastSegment, pt1, thisPolygons;
+
+    // initialize line join data / method
+    var segments = [];
+    var makeUpdate = Lib.noop;
+
+    ownFillEl3 = trace._ownFill;
+
+    if(subTypes.hasLines(trace) || trace.fill !== 'none') {
+        if(tonext) {
+            // This tells .style which trace to use for fill information:
+            tonext.datum(cdscatter);
+        }
+
+        if(['hv', 'vh', 'hvh', 'vhv'].indexOf(line.shape) !== -1) {
+            pathfn = Drawing.steps(line.shape);
+            revpathbase = Drawing.steps(
+                line.shape.split('').reverse().join('')
+            );
+        } else if(line.shape === 'spline') {
+            pathfn = revpathbase = function(pts) {
+                var pLast = pts[pts.length - 1];
+                if(pts.length > 1 && pts[0][0] === pLast[0] && pts[0][1] === pLast[1]) {
+                    // identical start and end points: treat it as a
+                    // closed curve so we don't get a kink
+                    return Drawing.smoothclosed(pts.slice(1), line.smoothing);
+                } else {
+                    return Drawing.smoothopen(pts, line.smoothing);
+                }
+            };
+        } else {
+            pathfn = revpathbase = function(pts) {
+                return 'M' + pts.join('L');
+            };
+        }
+
+        revpathfn = function(pts) {
+            // note: this is destructive (reverses pts in place) so can't use pts after this
+            return revpathbase(pts.reverse());
+        };
+
+        segments = linePoints(cdscatter, {
+            xaxis: xa,
+            yaxis: ya,
+            connectGaps: trace.connectgaps,
+            baseTolerance: Math.max(line.width || 1, 3) / 4,
+            shape: line.shape,
+            simplify: line.simplify,
+            fill: trace.fill
+        });
+
+        // since we already have the pixel segments here, use them to make
+        // polygons for hover on fill
+        // TODO: can we skip this if hoveron!=fills? That would mean we
+        // need to redraw when you change hoveron...
+        thisPolygons = trace._polygons = new Array(segments.length);
+        for(i = 0; i < segments.length; i++) {
+            trace._polygons[i] = polygonTester(segments[i]);
+        }
+
+        if(segments.length) {
+            pt0 = segments[0][0];
+            lastSegment = segments[segments.length - 1];
+            pt1 = lastSegment[lastSegment.length - 1];
+        }
+
+        makeUpdate = function(isEnter) {
+            return function(pts) {
+                thispath = pathfn(pts);
+                thisrevpath = revpathfn(pts);
+                if(!fullpath) {
+                    fullpath = thispath;
+                    revpath = thisrevpath;
+                } else if(ownFillDir) {
+                    fullpath += 'L' + thispath.substr(1);
+                    revpath = thisrevpath + ('L' + revpath.substr(1));
+                } else {
+                    fullpath += 'Z' + thispath;
+                    revpath = thisrevpath + 'Z' + revpath;
+                }
+
+                if(subTypes.hasLines(trace) && pts.length > 1) {
+                    var el = d3.select(this);
+
+                    // This makes the coloring work correctly:
+                    el.datum(cdscatter);
+
+                    if(isEnter) {
+                        transition(el.style('opacity', 0)
+                            .attr('d', thispath)
+                            .call(Drawing.lineGroupStyle))
+                                .style('opacity', 1);
+                    } else {
+                        var sel = transition(el);
+                        sel.attr('d', thispath);
+                        Drawing.singleLineStyle(cdscatter, sel);
+                    }
+                }
+            };
+        };
+    }
+
+    var lineJoin = lines.selectAll('.js-line').data(segments);
+
+    transition(lineJoin.exit())
+        .style('opacity', 0)
+        .remove();
+
+    lineJoin.each(makeUpdate(false));
+
+    lineJoin.enter().append('path')
+        .classed('js-line', true)
+        .style('vector-effect', 'non-scaling-stroke')
+        .call(Drawing.lineGroupStyle)
+        .each(makeUpdate(true));
+
+    Drawing.setClipUrl(lineJoin, plotinfo.layerClipId, gd);
+
+    function clearFill(selection) {
+        transition(selection).attr('d', 'M0,0Z');
+    }
+
+    if(segments.length) {
+        if(ownFillEl3) {
+            ownFillEl3.datum(cdscatter);
+            if(pt0 && pt1) {
+                if(ownFillDir) {
+                    if(ownFillDir === 'y') {
+                        pt0[1] = pt1[1] = ya.c2p(0, true);
+                    } else if(ownFillDir === 'x') {
+                        pt0[0] = pt1[0] = xa.c2p(0, true);
+                    }
+
+                    // fill to zero: full trace path, plus extension of
+                    // the endpoints to the appropriate axis
+                    // For the sake of animations, wrap the points around so that
+                    // the points on the axes are the first two points. Otherwise
+                    // animations get a little crazy if the number of points changes.
+                    transition(ownFillEl3).attr('d', 'M' + pt1 + 'L' + pt0 + 'L' + fullpath.substr(1))
+                        .call(Drawing.singleFillStyle);
+                } else {
+                    // fill to self: just join the path to itself
+                    transition(ownFillEl3).attr('d', fullpath + 'Z')
+                        .call(Drawing.singleFillStyle);
+                }
+            }
+        } else if(tonext) {
+            if(trace.fill.substr(0, 6) === 'tonext' && fullpath && prevRevpath) {
+                // fill to next: full trace path, plus the previous path reversed
+                if(trace.fill === 'tonext') {
+                    // tonext: for use by concentric shapes, like manually constructed
+                    // contours, we just add the two paths closed on themselves.
+                    // This makes strange results if one path is *not* entirely
+                    // inside the other, but then that is a strange usage.
+                    transition(tonext).attr('d', fullpath + 'Z' + prevRevpath + 'Z')
+                        .call(Drawing.singleFillStyle);
+                } else {
+                    // tonextx/y: for now just connect endpoints with lines. This is
+                    // the correct behavior if the endpoints are at the same value of
+                    // y/x, but if they *aren't*, we should ideally do more complicated
+                    // things depending on whether the new endpoint projects onto the
+                    // existing curve or off the end of it
+                    transition(tonext).attr('d', fullpath + 'L' + prevRevpath.substr(1) + 'Z')
+                        .call(Drawing.singleFillStyle);
+                }
+                trace._polygons = trace._polygons.concat(prevPolygons);
+            } else {
+                clearFill(tonext);
+                trace._polygons = null;
+            }
+        }
+        trace._prevRevpath = revpath;
+        trace._prevPolygons = thisPolygons;
+    } else {
+        if(ownFillEl3) clearFill(ownFillEl3);
+        else if(tonext) clearFill(tonext);
+        trace._polygons = trace._prevRevpath = trace._prevPolygons = null;
+    }
+
+
+    function visFilter(d) {
+        return d.filter(function(v) { return !v.gap && v.vis; });
+    }
+
+    function visFilterWithGaps(d) {
+        return d.filter(function(v) { return v.vis; });
+    }
+
+    function gapFilter(d) {
+        return d.filter(function(v) { return !v.gap; });
+    }
+
+    function keyFunc(d) {
+        return d.id;
+    }
+
+    // Returns a function if the trace is keyed, otherwise returns undefined
+    function getKeyFunc(trace) {
+        if(trace.ids) {
+            return keyFunc;
+        }
+    }
+
+    function hideFilter() {
+        return false;
+    }
+
+    function makePoints(points, text, cdscatter) {
+        var join, selection, hasNode;
+
+        var trace = cdscatter[0].trace;
+        var showMarkers = subTypes.hasMarkers(trace);
+        var showText = subTypes.hasText(trace);
+
+        var keyFunc = getKeyFunc(trace);
+        var markerFilter = hideFilter;
+        var textFilter = hideFilter;
+
+        if(showMarkers || showText) {
+            var showFilter = identity;
+            // if we're stacking, "infer zero" gap mode gets markers in the
+            // gap points - because we've inferred a zero there - but other
+            // modes (currently "interpolate", later "interrupt" hopefully)
+            // we don't draw generated markers
+            var stackGroup = trace.stackgroup;
+            var isInferZero = stackGroup && (
+                gd._fullLayout._scatterStackOpts[xa._id + ya._id][stackGroup].stackgaps === 'infer zero');
+            if(trace.marker.maxdisplayed || trace._needsCull) {
+                showFilter = isInferZero ? visFilterWithGaps : visFilter;
+            } else if(stackGroup && !isInferZero) {
+                showFilter = gapFilter;
+            }
+
+            if(showMarkers) markerFilter = showFilter;
+            if(showText) textFilter = showFilter;
+        }
+
+        // marker points
+
+        selection = points.selectAll('path.point');
+
+        join = selection.data(markerFilter, keyFunc);
+
+        var enter = join.enter().append('path')
+            .classed('point', true);
+
+        if(hasTransition) {
+            enter
+                .call(Drawing.pointStyle, trace, gd)
+                .call(Drawing.translatePoints, xa, ya, gd)
+                .style('opacity', 0)
+                .transition()
+                .style('opacity', 1);
+        }
+
+        join.order();
+
+        var styleFns;
+        if(showMarkers) {
+            styleFns = Drawing.makePointStyleFns(trace);
+        }
+
+        join.each(function(d) {
+            var el = d3.select(this);
+            var sel = transition(el);
+            hasNode = Drawing.translatePoint(d, sel, xa, ya, gd);
+
+            if(hasNode) {
+                Drawing.singlePointStyle(d, sel, trace, styleFns, gd);
+
+                if(plotinfo.layerClipId) {
+                    Drawing.hideOutsideRangePoint(d, sel, xa, ya, trace.xcalendar, trace.ycalendar);
+                }
+
+                if(trace.customdata) {
+                    el.classed('plotly-customdata', d.data !== null && d.data !== undefined);
+                }
+            } else {
+                sel.remove();
+            }
+        });
+
+        if(hasTransition) {
+            join.exit().transition()
+                .style('opacity', 0)
+                .remove();
+        } else {
+            join.exit().remove();
+        }
+
+        // text points
+        selection = text.selectAll('g');
+        join = selection.data(textFilter, keyFunc);
+
+        // each text needs to go in its own 'g' in case
+        // it gets converted to mathjax
+        join.enter().append('g').classed('textpoint', true).append('text');
+
+        join.order();
+
+        join.each(function(d) {
+            var g = d3.select(this);
+            var sel = transition(g.select('text'));
+            hasNode = Drawing.translatePoint(d, sel, xa, ya, gd);
+
+            if(hasNode) {
+                if(plotinfo.layerClipId) {
+                    Drawing.hideOutsideRangePoint(d, g, xa, ya, trace.xcalendar, trace.ycalendar);
+                }
+            } else {
+                g.remove();
+            }
+        });
+
+        join.selectAll('text')
+            .call(Drawing.textPointStyle, trace, gd)
+            .each(function(d) {
+                // This just *has* to be totally custom becuase of SVG text positioning :(
+                // It's obviously copied from translatePoint; we just can't use that
+                var x = xa.c2p(d.x);
+                var y = ya.c2p(d.y);
+
+                d3.select(this).selectAll('tspan.line').each(function() {
+                    transition(d3.select(this)).attr({x: x, y: y});
+                });
+            });
+        
+        if (!hasTransition) updateSpikeLinesWithoutPoints(gd, xa, ya);
+
+        join.exit().remove();
+    }
+
+    points.datum(cdscatter);
+    text.datum(cdscatter);
+    makePoints(points, text, cdscatter);
+
+    // lastly, clip points groups of `cliponaxis !== false` traces
+    // on `plotinfo._hasClipOnAxisFalse === true` subplots
+    var hasClipOnAxisFalse = trace.cliponaxis === false;
+    var clipUrl = hasClipOnAxisFalse ? null : plotinfo.layerClipId;
+    Drawing.setClipUrl(points, clipUrl, gd);
+    Drawing.setClipUrl(text, clipUrl, gd);
+}
+
+function selectMarkers(gd, idx, plotinfo, cdscatter, cdscatterAll) {
+    var xa = plotinfo.xaxis;
+    var ya = plotinfo.yaxis;
+    var xr = d3.extent(Lib.simpleMap(xa.range, xa.r2c));
+    var yr = d3.extent(Lib.simpleMap(ya.range, ya.r2c));
+
+    var trace = cdscatter[0].trace;
+    if(!subTypes.hasMarkers(trace)) return;
+    // if marker.maxdisplayed is used, select a maximum of
+    // mnum markers to show, from the set that are in the viewport
+    var mnum = trace.marker.maxdisplayed;
+
+    // TODO: remove some as we get away from the viewport?
+    if(mnum === 0) return;
+
+    var cd = cdscatter.filter(function(v) {
+        return v.x >= xr[0] && v.x <= xr[1] && v.y >= yr[0] && v.y <= yr[1];
+    });
+    var inc = Math.ceil(cd.length / mnum);
+    var tnum = 0;
+    cdscatterAll.forEach(function(cdj, j) {
+        var tracei = cdj[0].trace;
+        if(subTypes.hasMarkers(tracei) &&
+                tracei.marker.maxdisplayed > 0 && j < idx) {
+            tnum++;
+        }
+    });
+
+    // if multiple traces use maxdisplayed, stagger which markers we
+    // display this formula offsets successive traces by 1/3 of the
+    // increment, adding an extra small amount after each triplet so
+    // it's not quite periodic
+    var i0 = Math.round(tnum * inc / 3 + Math.floor(tnum / 3) * inc / 7.1);
+
+    // for error bars: save in cd which markers to show
+    // so we don't have to repeat this
+    cdscatter.forEach(function(v) { delete v.vis; });
+    cd.forEach(function(v, i) {
+        if(Math.round((i + i0) % inc) === 0) v.vis = true;
+    });
+}
+function updateSpikeLinesWithoutPoints(gd, xa, ya) {
+    if(gd === null || gd === undefined) return;
+
+    var plotId = xa._id + ya._id;
+    var plot = gd._fullLayout._plots[plotId];
+
+    // Assuming there is only 1 line per plot.
+    var lineElem = plot.plot[0][0].querySelectorAll('.lines .js-line');
+    if(lineElem.length === 0 || lineElem[0] === undefined || lineElem[0] === null) return;
+    var isPointPresentInPlot = false;
+    var traceChildNodes = lineElem[0].parentElement.parentElement.children;
+    for(var i = 0; i < traceChildNodes.length; i++) {
+        if(traceChildNodes[i].className === 'points') {
+            isPointPresentInPlot = traceChildNodes[i].children > 0;
+            break;
+        }
+    }
+    if(isPointPresentInPlot) return;
+
+    var spikeLines = gd._fullLayout._hoverlayer.selectAll('.spikeline')
+        .filter('.' + plotId);
+
+    if(spikeLines[0].length === 0) return;
+
+    var xSpikeLines = spikeLines.filter('.' + xa._name);
+    var ySpikeLines = spikeLines.filter('.' + ya._name);
+
+    var xRange = xa._rl[1] - xa._rl[0];
+    var yRange = ya._rl[1] - ya._rl[0];
+
+    var yaxisHeight = ya._length;
+    var xaxisWidth = xa._length;
+
+    var dy = 0;
+    var dx = 0;
+
+    var previousDy = xSpikeLines[0][0].dy === undefined ? 0 : xSpikeLines[0][0].dy;
+    var previousDx = ySpikeLines[0][0].dx === undefined ? 0 : ySpikeLines[0][0].dx;
+
+    var plotPositionMatrix = gd._fullLayout._plots[plotId].plot[0][0].transform.animVal[0].matrix;
+
+    var py = xSpikeLines[0][0].getAttribute('py');
+    var pointNumber = xSpikeLines[0][0].getAttribute('pNumber');
+    var yRatio = 1 - ((py - ya._rl[0]) / yRange);
+    var y0 = plotPositionMatrix.f;
+
+    var px = ySpikeLines[0][0].getAttribute('px');
+    var xRatio = (px - xa._rl[0]) / xRange;
+    var x0 = plotPositionMatrix.e;
+
+    dy = (yRatio * yaxisHeight) + y0 - (parseInt(xSpikeLines[0][0].getAttribute('y1')) + previousDy);
+    dx = (xRatio * xaxisWidth) + x0 - (parseInt(ySpikeLines[0][0].getAttribute('x1')) + previousDx);
+
+    Drawing.repositionPersistentSpikeLines(gd, px, py, pointNumber, dx, dy, xa, ya);
+}
+},{"../../components/drawing":400,"../../lib":506,"../../lib/polygon":518,"../../registry":606,"./line_points":655,"./link_traces":657,"./subtypes":665,"d3":81}],662:[function(_dereq_,module,exports){
+/**
+* Copyright 2012-2020, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+
+'use strict';
+
+var subtypes = _dereq_('./subtypes');
+
+module.exports = function selectPoints(searchInfo, selectionTester) {
+    var cd = searchInfo.cd;
+    var xa = searchInfo.xaxis;
+    var ya = searchInfo.yaxis;
+    var selection = [];
+    var trace = cd[0].trace;
+    var i;
+    var di;
+    var x;
+    var y;
+
+    var hasOnlyLines = (!subtypes.hasMarkers(trace) && !subtypes.hasText(trace));
+    if(hasOnlyLines) return [];
+
+    if(selectionTester === false) { // clear selection
+        for(i = 0; i < cd.length; i++) {
+            cd[i].selected = 0;
+        }
+    } else {
+        for(i = 0; i < cd.length; i++) {
+            di = cd[i];
+            x = xa.c2p(di.x);
+            y = ya.c2p(di.y);
+
+            if((di.i !== null) && selectionTester.contains([x, y], false, i, searchInfo)) {
+                selection.push({
+                    pointNumber: di.i,
+                    x: xa.c2d(di.x),
+                    y: ya.c2d(di.y)
+                });
+                di.selected = 1;
+            } else {
+                di.selected = 0;
+            }
+        }
+    }
+
+    return selection;
+};
+
+},{"./subtypes":665}],663:[function(_dereq_,module,exports){
+/**
+* Copyright 2012-2020, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+'use strict';
+
+var perStackAttrs = ['orientation', 'groupnorm', 'stackgaps'];
+
+module.exports = function handleStackDefaults(traceIn, traceOut, layout, coerce) {
+    var stackOpts = layout._scatterStackOpts;
+
+    var stackGroup = coerce('stackgroup');
+    if(stackGroup) {
+        // use independent stacking options per subplot
+        var subplot = traceOut.xaxis + traceOut.yaxis;
+        var subplotStackOpts = stackOpts[subplot];
+        if(!subplotStackOpts) subplotStackOpts = stackOpts[subplot] = {};
+
+        var groupOpts = subplotStackOpts[stackGroup];
+        var firstTrace = false;
+        if(groupOpts) {
+            groupOpts.traces.push(traceOut);
+        } else {
+            groupOpts = subplotStackOpts[stackGroup] = {
+                // keep track of trace indices for use during stacking calculations
+                // this will be filled in during `calc` and used during `crossTraceCalc`
+                // so it's OK if we don't recreate it during a non-calc edit
+                traceIndices: [],
+                // Hold on to the whole set of prior traces
+                // First one is most important, so we can clear defaults
+                // there if we find explicit values only in later traces.
+                // We're only going to *use* the values stored in groupOpts,
+                // but for the editor and validate we want things self-consistent
+                // The full set of traces is used only to fix `fill` default if
+                // we find `orientation: 'h'` beyond the first trace
+                traces: [traceOut]
+            };
+            firstTrace = true;
+        }
+        // TODO: how is this going to work with groupby transforms?
+        // in principle it should be OK I guess, as long as explicit group styles
+        // don't override explicit base-trace styles?
+
+        var dflts = {
+            orientation: (traceOut.x && !traceOut.y) ? 'h' : 'v'
+        };
+
+        for(var i = 0; i < perStackAttrs.length; i++) {
+            var attr = perStackAttrs[i];
+            var attrFound = attr + 'Found';
+            if(!groupOpts[attrFound]) {
+                var traceHasAttr = traceIn[attr] !== undefined;
+                var isOrientation = attr === 'orientation';
+                if(traceHasAttr || firstTrace) {
+                    groupOpts[attr] = coerce(attr, dflts[attr]);
+
+                    if(isOrientation) {
+                        groupOpts.fillDflt = groupOpts[attr] === 'h' ?
+                            'tonextx' : 'tonexty';
+                    }
+
+                    if(traceHasAttr) {
+                        // Note: this will show a value here even if it's invalid
+                        // in which case it will revert to default.
+                        groupOpts[attrFound] = true;
+
+                        // Note: only one trace in the stack will get a _fullData
+                        // entry for a given stack-wide attribute. If no traces
+                        // (or the first trace) specify that attribute, the
+                        // first trace will get it. If the first trace does NOT
+                        // specify it but some later trace does, then it gets
+                        // removed from the first trace and only included in the
+                        // one that specified it. This is mostly important for
+                        // editors (that want to see the full values to know
+                        // what settings are available) and Plotly.react diffing.
+                        // Editors may want to use fullLayout._scatterStackOpts
+                        // directly and make these settings available from all
+                        // traces in the stack... then set the new value into
+                        // the first trace, and clear all later traces.
+                        if(!firstTrace) {
+                            delete groupOpts.traces[0][attr];
+
+                            // orientation can affect default fill of previous traces
+                            if(isOrientation) {
+                                for(var j = 0; j < groupOpts.traces.length - 1; j++) {
+                                    var trace2 = groupOpts.traces[j];
+                                    if(trace2._input.fill !== trace2.fill) {
+                                        trace2.fill = groupOpts.fillDflt;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return groupOpts;
+    }
+};
+
+},{}],664:[function(_dereq_,module,exports){
+/**
+* Copyright 2012-2020, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+
+'use strict';
+
+var d3 = _dereq_('d3');
+var Drawing = _dereq_('../../components/drawing');
+var Registry = _dereq_('../../registry');
+
+function style(gd) {
+    var s = d3.select(gd).selectAll('g.trace.scatter');
+
+    s.style('opacity', function(d) {
+        return d[0].trace.opacity;
+    });
+
+    s.selectAll('g.points').each(function(d) {
+        var sel = d3.select(this);
+        var trace = d.trace || d[0].trace;
+        stylePoints(sel, trace, gd);
+    });
+
+    s.selectAll('g.text').each(function(d) {
+        var sel = d3.select(this);
+        var trace = d.trace || d[0].trace;
+        styleText(sel, trace, gd);
+    });
+
+    s.selectAll('g.trace path.js-line')
+        .call(Drawing.lineGroupStyle);
+
+    s.selectAll('g.trace path.js-fill')
+        .call(Drawing.fillGroupStyle);
+
+    Registry.getComponentMethod('errorbars', 'style')(s);
+}
+
+function stylePoints(sel, trace, gd) {
+    Drawing.pointStyle(sel.selectAll('path.point'), trace, gd);
+}
+
+function styleText(sel, trace, gd) {
+    Drawing.textPointStyle(sel.selectAll('text'), trace, gd);
+}
+
+function styleOnSelect(gd, cd, sel) {
+    var trace = cd[0].trace;
+
+    if(trace.selectedpoints) {
+        Drawing.selectedPointStyle(sel.selectAll('path.point'), trace);
+        Drawing.selectedTextStyle(sel.selectAll('text'), trace);
+    } else {
+        stylePoints(sel, trace, gd);
+        styleText(sel, trace, gd);
+    }
+}
+
+module.exports = {
+    style: style,
+    stylePoints: stylePoints,
+    styleText: styleText,
+    styleOnSelect: styleOnSelect
+};
+
+},{"../../components/drawing":400,"../../registry":606,"d3":81}],665:[function(_dereq_,module,exports){
+/**
+* Copyright 2012-2020, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+
+'use strict';
+
+var Lib = _dereq_('../../lib');
+
+module.exports = {
+    hasLines: function(trace) {
+        return trace.visible && trace.mode &&
+            trace.mode.indexOf('lines') !== -1;
+    },
+
+    hasMarkers: function(trace) {
+        return trace.visible && (
+            (trace.mode && trace.mode.indexOf('markers') !== -1) ||
+            // until splom implements 'mode'
+            trace.type === 'splom'
+        );
+    },
+
+    hasText: function(trace) {
+        return trace.visible && trace.mode &&
+            trace.mode.indexOf('text') !== -1;
+    },
+
+    isBubble: function(trace) {
+        return Lib.isPlainObject(trace.marker) &&
+            Lib.isArrayOrTypedArray(trace.marker.size);
+    }
+};
+
+},{"../../lib":506}],666:[function(_dereq_,module,exports){
+/**
+* Copyright 2012-2020, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+
+'use strict';
+
+var Lib = _dereq_('../../lib');
+
+/*
+ * opts: object of flags to control features not all text users support
+ *   noSelect: caller does not support selected/unselected attribute containers
+ */
+module.exports = function(traceIn, traceOut, layout, coerce, opts) {
+    opts = opts || {};
+
+    coerce('textposition');
+    Lib.coerceFont(coerce, 'textfont', layout.font);
+
+    if(!opts.noSelect) {
+        coerce('selected.textfont.color');
+        coerce('unselected.textfont.color');
+    }
+};
+
+},{"../../lib":506}],667:[function(_dereq_,module,exports){
+/**
+* Copyright 2012-2020, Plotly, Inc.
+* All rights reserved.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+
+'use strict';
+
+var Lib = _dereq_('../../lib');
+var Registry = _dereq_('../../registry');
+
+module.exports = function handleXYDefaults(traceIn, traceOut, layout, coerce) {
+    var x = coerce('x');
+    var y = coerce('y');
+    var len;
+
+    var handleCalendarDefaults = Registry.getComponentMethod('calendars', 'handleTraceDefaults');
+    handleCalendarDefaults(traceIn, traceOut, ['x', 'y'], layout);
+
+    if(x) {
+        var xlen = Lib.minRowLength(x);
+        if(y) {
+            len = Math.min(xlen, Lib.minRowLength(y));
+        } else {
+            len = xlen;
+            coerce('y0');
+            coerce('dy');
+        }
+    } else {
+        if(!y) return 0;
+
+        len = Lib.minRowLength(y);
+        coerce('x0');
+        coerce('dx');
+    }
+
+    traceOut._length = len;
+
+    return len;
+};
+
+},{"../../lib":506,"../../registry":606}],668:[function(_dereq_,module,exports){
 /**
 * Copyright 2012-2020, Plotly, Inc.
 * All rights reserved.
