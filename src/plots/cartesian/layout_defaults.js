@@ -145,6 +145,9 @@ module.exports = function supplyLayoutDefaults(layoutIn, layoutOut, fullData) {
         handleAxisDefaults(axLayoutIn, axLayoutOut, coerce, defaultOptions);
         handlePositionDefaults(axLayoutIn, axLayoutOut, coerce, positioningOptions);
 
+        axLayoutOut.subPlotsLabeled = axLayoutIn.subPlotsLabeled;
+        axLayoutOut.spikePersistOnClick = axLayoutIn.spikePersistOnClick;
+
         layoutOut[axName] = axLayoutOut;
 
         // so we don't have to repeat autotype unnecessarily,

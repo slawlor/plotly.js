@@ -17,6 +17,13 @@ var rangeSelectorAttrs = require('../../components/rangeselector/attributes');
 
 
 module.exports = {
+    spikePersistOnClick: {
+        valType: 'boolean',
+        dflt: false,
+        role: 'style',
+        editType: 'none',
+        description: 'Set rather if spike line should persist after clicking on the hover point'
+    },
     color: {
         valType: 'color',
         dflt: colorAttrs.defaultLine,
@@ -234,6 +241,64 @@ module.exports = {
         dflt: true,
         role: 'style',
         description: 'Determines whether or not the tick labels are drawn.'
+    },
+    showspikes: {
+        valType: 'boolean',
+        dflt: false,
+        role: 'style',
+        editType: 'modebar',
+        description: [
+            'Determines whether or not spikes (aka droplines) are drawn for this axis.',
+            'Note: This only takes affect when hovermode = closest'
+        ].join(' ')
+    },
+    spikecolor: {
+        valType: 'color',
+        dflt: null,
+        role: 'style',
+        editType: 'none',
+        description: 'Sets the spike color. If undefined, will use the series color'
+    },
+    spikethickness: {
+        valType: 'number',
+        dflt: 3,
+        role: 'style',
+        editType: 'none',
+        description: 'Sets the width (in px) of the zero line.'
+    },
+    spikedash: extendFlat({}, dash, {dflt: 'dash', editType: 'none'}),
+    spikemode: {
+        valType: 'flaglist',
+        flags: ['toaxis', 'across', 'marker'],
+        role: 'style',
+        dflt: 'toaxis',
+        editType: 'none',
+        description: [
+            'Determines the drawing mode for the spike line',
+            'If *toaxis*, the line is drawn from the data point to the axis the ',
+            'series is plotted on.',
+
+            'If *across*, the line is drawn across the entire plot area, and',
+            'supercedes *toaxis*.',
+
+            'If *marker*, then a marker dot is drawn on the axis the series is',
+            'plotted on'
+        ].join(' ')
+    },
+    spikesnap: {
+        valType: 'enumerated',
+        values: ['data', 'cursor', 'hovered data'],
+        dflt: 'data',
+        role: 'style',
+        editType: 'none',
+        description: 'Determines whether spikelines are stuck to the cursor or to the closest datapoints.'
+    },
+    subPlotsLabeled:{
+        valType: 'boolean',
+        dflt: false,
+        role: 'style',
+        editType: 'none',
+        description: 'Set rather if all subplots should have the axis labels, only works for x axis for now'
     },
     tickfont: extendFlat({}, fontAttrs, {
         description: 'Sets the tick font.'

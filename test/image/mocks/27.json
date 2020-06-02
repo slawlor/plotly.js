@@ -233,6 +233,7 @@
                 "color": ""
             }, 
             "exponentformat": "e", 
+            "spikePersistOnClick" : true,
             "showexponent": "all", 
             "gridcolor": "#ddd", 
             "gridwidth": 1, 
@@ -269,6 +270,7 @@
             "autotick": true, 
             "nticks": 0, 
             "ticks": "", 
+            "spikePersistOnClick" : true,
             "showticklabels": true, 
             "tick0": 0, 
             "dtick": 0.05, 

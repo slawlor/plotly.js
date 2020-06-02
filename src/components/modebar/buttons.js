@@ -10,6 +10,7 @@
 'use strict';
 
 var Plotly = require('../../plotly');
+var resetSpikeLines = require('../fx/hover').resetSpikeLines;
 var Lib = require('../../lib');
 var setCursor = require('../../lib/setcursor');
 var Snapshot = require('../../snapshot');
@@ -211,7 +212,9 @@ function handleCartesian(gd, ev) {
         val = button.getAttribute('data-val') || true,
         fullLayout = gd._fullLayout,
         aobj = {};
-
+    var axList = axisIds.list(gd, null, true);
+    var allSpikesEnabled = fullLayout._cartesianSpikesEnabled;
+    if (astr === 'zoom' && val === 'reset') resetSpikeLines(gd);
     if(astr === 'zoom') {
         var mag = (val === 'in') ? 0.5 : 2,
             r0 = (1 + mag) / 2,
@@ -544,4 +547,39 @@ modeBarButtons.resetViews = {
         // N.B handleCamera3d also triggers a replot for
         // geo subplots.
     }
+};
+
+modeBarButtons.toggleSpikelines = {
+    name: 'toggleSpikelines',
+    title: function(gd) { return _(gd, 'Toggle Spike Lines'); },
+    icon: Icons.spikeline,
+    attr: '_cartesianSpikesEnabled',
+    val: 'on',
+    click: function(gd) {
+        var fullLayout = gd._fullLayout;
+        var allSpikesEnabled = fullLayout._cartesianSpikesEnabled;
+
+        if (allSpikesEnabled === 'on') {
+            fullLayout._cartesianSpikesEnabled = 'off';
+            resetSpikeLines(gd);
+        }
+        else {
+            fullLayout._cartesianSpikesEnabled = 'on';
+        }
+        Registry.call('_guiRelayout', gd, setSpikelineVisibility(gd));
+    }
+};
+
+function setSpikelineVisibility(gd) {
+    var fullLayout = gd._fullLayout;
+    var areSpikesOn = fullLayout._cartesianSpikesEnabled === 'on';
+    var axList = axisIds.list(gd, null, true);
+    var aobj = {};
+
+    for(var i = 0; i < axList.length; i++) {
+        var ax = axList[i];
+        aobj[ax._name + '.showspikes'] = areSpikesOn ? true : ax._showSpikeInitial;
+    }
+
+    return aobj;
 };

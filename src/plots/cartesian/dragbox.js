@@ -17,6 +17,8 @@ var setCursor = require('../../lib/setcursor');
 var dragElement = require('../../components/dragelement');
 
 var prepSelect = require('./select');
+var repositionPersistentSpikeLinesOnDrag = require('../../components/fx/hover').repositionPersistentSpikeLinesOnDrag;
+var cachedSpikeLinesPositions = require('../../components/fx/hover').cachedSpikeLinesPositions;
 var constants = require('./constants');
 
 
@@ -432,7 +434,9 @@ module.exports = function dragBox(gd, plotinfo, x, y, w, h, ns, ew) {
         if(xActive === 'ew' || yActive === 'ns') {
             if(xActive) dragAxList(xa, dx);
             if(yActive) dragAxList(ya, dy);
-            updateViewBoxes([xActive ? -dx : 0, yActive ? -dy : 0, pw, ph]);
+            var viewBox = [xActive ? -dx : 0, yActive ? -dy : 0, pw, ph];
+            updateSpikeLines(gd, viewBox, xaxes, yaxes);
+            updateViewBoxes(viewBox);
             ticksAndAnnotations(yActive, xActive);
             return;
         }
@@ -576,6 +580,7 @@ module.exports = function dragBox(gd, plotinfo, x, y, w, h, ns, ew) {
         }
 
         updateViewBoxes([0,0,pw,ph]);
+        cacheSpikeLines(gd, xaxes, yaxes);
         Plotly.relayout(gd,attrs);
     }
 
@@ -649,4 +654,11 @@ function removeZoombox(gd) {
     d3.select(gd)
         .selectAll('.zoombox,.js-zoombox-backdrop,.js-zoombox-menu,.zoombox-corners')
         .remove();
+}
+function updateSpikeLines(gd, viewBox, xaxes, yaxes){    
+    repositionPersistentSpikeLinesOnDrag(gd, xaxes, yaxes, -viewBox[0], -viewBox[1]);    
+}
+
+function cacheSpikeLines(gd, xaxes, yaxes){
+    cachedSpikeLinesPositions(gd, xaxes, yaxes);
 }

@@ -13,6 +13,8 @@
 var Events = require('../../lib/events');
 
 
+var removeNonPersistentSpikeLines = require('../fx/hover').removeNonPersistentSpikeLines
+
 var unhover = module.exports = {};
 
 
@@ -40,6 +42,10 @@ unhover.raw = function unhoverRaw(gd, evt) {
     }
 
     fullLayout._hoverlayer.selectAll('g').remove();
+    removeNonPersistentSpikeLines(gd);
+    //fullLayout._hoverlayer.selectAll('line').remove();
+    fullLayout._hoverlayer.selectAll('circle').remove();
+    gd._hoverdata = undefined;
 
     if(evt.target && gd._hoverdata) {
         gd.emit('plotly_unhover', {points: gd._hoverdata});

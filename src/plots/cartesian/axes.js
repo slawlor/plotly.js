@@ -1346,16 +1346,123 @@ axes.doTicks = function(gd, axid, skipTitle) {
         }
     }
 
-    // make sure we only have allowed options for exponents
-    // (others can make confusing errors)
-    if(!ax.tickformat) {
-        if(['none', 'e', 'E', 'power', 'SI', 'B'].indexOf(ax.exponentformat) === -1) {
-            ax.exponentformat = 'e';
+    var seq = [];
+
+    if (axLetter === 'x'){
+        if (ax.subPlotsLabeled){
+            // Label all the sub plots.
+            var subPlots = ax._subplotsWith; 
+
+            for (var i = 0; i < subPlots.length; i++) {
+                var subPlotId = subPlots[i];
+                var yMatch = subPlotId.match(/y(\d)*$/);
+                if (yMatch === null || yMatch.length <= 0) continue;
+                var subAx = axes.getFromId(gd, yMatch[0], 'y');
+                var subTransFn = axes.makeTransFn2(gd, ax, subAx);
+                var subPlotInfo = fullLayout._plots[subPlotId];
+                var subAxLayer = subPlotInfo[axLetter + 'axislayer'];
+                var opts = {
+                    vals: vals,
+                    layer: subAxLayer,
+                    transFn: subTransFn,
+                    labelFns: axes.makeLabelFns(ax, mainLinePosition)
+                };
+                
+                seq.push(buildLabelingFunc(gd, ax, opts));
+            }
+        }
+        else{
+            //Label only the main plot (sub plot at the bottom)
+            var opts = {
+                    vals: vals,
+                    layer: mainAxLayer,
+                    transFn: transFn,
+                    labelFns: axes.makeLabelFns(ax, mainLinePosition)
+            };
+            seq.push(buildLabelingFunc(gd, ax, opts));
+        }        
+    }
+    else{
+        seq.push(function() {
+            return axes.drawLabels(gd, ax, {
+                vals: vals,
+                layer: mainAxLayer,
+                transFn: transFn,
+                labelFns: axes.makeLabelFns(ax, mainLinePosition)
+                });
+         });
+    }
+    // seq.push(function() {
+    //     return axes.drawLabels(gd, ax, {
+    //         vals: vals,
+    //         layer: mainAxLayer,
+    //         transFn: transFn,
+    //         labelFns: axes.makeLabelFns(ax, mainLinePosition)
+    //     });
+    // });
+
+    if(ax.type === 'multicategory') {
+        var pad = {x: 2, y: 10}[axLetter];
+
+        seq.push(function() {
+            var bboxKey = {x: 'height', y: 'width'}[axLetter];
+            var standoff = getLabelLevelBbox()[bboxKey] + pad +
+                (ax._tickAngles[axId + 'tick'] ? ax.tickfont.size * LINE_SPACING : 0);
+
+            return axes.drawLabels(gd, ax, {
+                vals: getSecondaryLabelVals(ax, vals),
+                layer: mainAxLayer,
+                cls: axId + 'tick2',
+                repositionOnUpdate: true,
+                secondary: true,
+                transFn: transFn,
+                labelFns: axes.makeLabelFns(ax, mainLinePosition + standoff * tickSigns[4])
+            });
+        });
+
+        seq.push(function() {
+            ax._depth = tickSigns[4] * (getLabelLevelBbox('tick2')[ax.side] - mainLinePosition);
+
+            return drawDividers(gd, ax, {
+                vals: dividerVals,
+                layer: mainAxLayer,
+                path: axes.makeTickPath(ax, mainLinePosition, tickSigns[4], ax._depth),
+                transFn: transFn
+            });
+        });
+    } else if(ax.title.hasOwnProperty('standoff')) {
+        seq.push(function() {
+            ax._depth = tickSigns[4] * (getLabelLevelBbox()[ax.side] - mainLinePosition);
+        });
+    }
+
+    var hasRangeSlider = Registry.getComponentMethod('rangeslider', 'isVisible')(ax);
+
+    seq.push(function() {
+        var s = ax.side.charAt(0);
+        var sMirror = OPPOSITE_SIDE[ax.side].charAt(0);
+        var pos = axes.getPxPosition(gd, ax);
+        var outsideTickLen = ax.ticks === 'outside' ? ax.ticklen : 0;
+        var llbbox;
+
+        var push;
+        var mirrorPush;
+        var rangeSliderPush;
+
+        if(ax.automargin || hasRangeSlider) {
+            if(ax.type === 'multicategory') {
+                llbbox = getLabelLevelBbox('tick2');
+            } else {
+                llbbox = getLabelLevelBbox();
+                if(axLetter === 'x' && s === 'b') {
+                    ax._depth = Math.max(llbbox.width > 0 ? llbbox.bottom - pos : 0, outsideTickLen);
+                }
+            }
         }
         if(['all', 'first', 'last', 'none'].indexOf(ax.showexponent) === -1) {
             ax.showexponent = 'all';
         }
-    }
+    });
 
     // in case a val turns into string somehow
     ax.range = [+ax.range[0], +ax.range[1]];
@@ -1974,3 +2081,23 @@ function swapAxisAttrs(layout, key, xFullAxes, yFullAxes) {
 // mod - version of modulus that always restricts to [0,divisor)
 // rather than built-in % which gives a negative value for negative v
 function mod(v,d) { return ((v%d) + d) % d; }
+function getLabelOffsetHeight(gd, xAxisId, yAxisId, mainLinePosition, fontSize){
+
+    var plotId = xAxisId + yAxisId;
+    var plotPositionY = gd._fullLayout._plots[plotId].plot[0][0].transform.animVal[0].matrix.f;
+
+    var plotHeight = 0;
+    var siblings = gd._fullLayout._plots.xy.plot[0][0].parentNode.childNodes;
+    for (var i = 0; i < siblings.length; i++) {
+        var node = siblings[i];
+        if (node.className.baseVal === "gridlayer" || node.className.animVal === "gridlayer") {
+          plotHeight = node.getBoundingClientRect().height;
+        }        
+    }
+
+    return (plotHeight + plotPositionY) - mainLinePosition - fontSize/2;
+}
+
+function buildLabelingFunc(gd, ax, opts){
+    return function(){axes.drawLabels(gd, ax, opts)};
+}

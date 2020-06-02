@@ -5584,7 +5584,8 @@
             "position": 0, 
             "mirror": "all", 
             "overlaying": false, 
-            "autorange": true
+            "autorange": true,
+            "subPlotsLabeled": true
         }, 
         "yaxis": {
             "title": "petal width", 
@@ -5610,6 +5611,7 @@
             "nticks": 0, 
             "ticks": "", 
             "showticklabels": true, 
+            "spikePersistOnClick": true,
             "tick0": 0, 
             "dtick": 2, 
             "ticklen": 5, 
@@ -5623,6 +5625,7 @@
             }, 
             "exponentformat": "e", 
             "showexponent": "all", 
+            "subPlotsLabeled": true,
             "gridcolor": "#ddd", 
             "gridwidth": 1, 
             "zerolinecolor": "#000", 
