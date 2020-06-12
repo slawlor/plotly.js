@@ -254,6 +254,9 @@ module.exports = function supplyLayoutDefaults(layoutIn, layoutOut, fullData) {
         handleTypeDefaults(axLayoutIn, axLayoutOut, coerce, defaultOptions);
         handleAxisDefaults(axLayoutIn, axLayoutOut, coerce, defaultOptions, layoutOut);
 
+        axLayoutOut.subPlotsLabeled = axLayoutIn.subPlotsLabeled;
+        axLayoutOut.spikePersistOnClick = axLayoutIn.spikePersistOnClick;
+
         var unifiedSpike = unifiedHover && axLetter === hovermode.charAt(0);
         var spikecolor = coerce2('spikecolor', unifiedHover ? axLayoutOut.color : undefined);
         var spikethickness = coerce2('spikethickness', unifiedHover ? 1.5 : undefined);
