@@ -54,12 +54,15 @@ var list = [
     'axes_breaks-candlestick2',
     'axes_breaks-contour1d',
     'axes_breaks-contour2d',
+    'axes_breaks-dtick_auto',
+    'axes_breaks-dtick_hourly',
     'axes_breaks-finance',
     'axes_breaks-gridlines',
     'axes_breaks-heatmap1d',
     'axes_breaks-heatmap2d',
     'axes_breaks-histogram2d',
     'axes_breaks-night_autorange-reversed',
+    'axes_breaks-overlap',
     'axes_breaks-rangeslider',
     'axes_breaks-reversed-without-pattern',
     'axes_breaks-round-weekdays',
@@ -108,6 +111,7 @@ var list = [
     'bar_display_height_zero_no_line_width',
     'bar_display_height_zero_only_line_width',
     'bar_errorbars_inherit_color',
+    'bar_gantt-chart',
     'bar_group_percent',
     'bar_hide_nulls',
     'bar_line',
@@ -134,6 +138,7 @@ var list = [
     'bar-like_traces_tozero',
     'bar-marker-line-colorscales',
     'bar-offsetgroups',
+    'bar-with-milliseconds',
     'basic_area',
     'basic_bar',
     'basic_error_bar',
@@ -1090,12 +1095,15 @@ figs['axes_breaks-candlestick'] = require('@mocks/axes_breaks-candlestick');
 figs['axes_breaks-candlestick2'] = require('@mocks/axes_breaks-candlestick2');
 figs['axes_breaks-contour1d'] = require('@mocks/axes_breaks-contour1d');
 figs['axes_breaks-contour2d'] = require('@mocks/axes_breaks-contour2d');
+figs['axes_breaks-dtick_auto'] = require('@mocks/axes_breaks-dtick_auto');
+figs['axes_breaks-dtick_hourly'] = require('@mocks/axes_breaks-dtick_hourly');
 figs['axes_breaks-finance'] = require('@mocks/axes_breaks-finance');
 figs['axes_breaks-gridlines'] = require('@mocks/axes_breaks-gridlines');
 figs['axes_breaks-heatmap1d'] = require('@mocks/axes_breaks-heatmap1d');
 figs['axes_breaks-heatmap2d'] = require('@mocks/axes_breaks-heatmap2d');
 figs['axes_breaks-histogram2d'] = require('@mocks/axes_breaks-histogram2d');
 figs['axes_breaks-night_autorange-reversed'] = require('@mocks/axes_breaks-night_autorange-reversed');
+figs['axes_breaks-overlap'] = require('@mocks/axes_breaks-overlap');
 figs['axes_breaks-rangeslider'] = require('@mocks/axes_breaks-rangeslider');
 figs['axes_breaks-reversed-without-pattern'] = require('@mocks/axes_breaks-reversed-without-pattern');
 figs['axes_breaks-round-weekdays'] = require('@mocks/axes_breaks-round-weekdays');
@@ -1144,6 +1152,7 @@ figs['bar_display_height_zero'] = require('@mocks/bar_display_height_zero');
 figs['bar_display_height_zero_no_line_width'] = require('@mocks/bar_display_height_zero_no_line_width');
 figs['bar_display_height_zero_only_line_width'] = require('@mocks/bar_display_height_zero_only_line_width');
 figs['bar_errorbars_inherit_color'] = require('@mocks/bar_errorbars_inherit_color');
+figs['bar_gantt-chart'] = require('@mocks/bar_gantt-chart');
 figs['bar_group_percent'] = require('@mocks/bar_group_percent');
 figs['bar_hide_nulls'] = require('@mocks/bar_hide_nulls');
 figs['bar_line'] = require('@mocks/bar_line');
@@ -1170,6 +1179,7 @@ figs['bar-like_traces_no-tozero_stack'] = require('@mocks/bar-like_traces_no-toz
 figs['bar-like_traces_tozero'] = require('@mocks/bar-like_traces_tozero');
 figs['bar-marker-line-colorscales'] = require('@mocks/bar-marker-line-colorscales');
 figs['bar-offsetgroups'] = require('@mocks/bar-offsetgroups');
+figs['bar-with-milliseconds'] = require('@mocks/bar-with-milliseconds');
 figs['basic_area'] = require('@mocks/basic_area');
 figs['basic_bar'] = require('@mocks/basic_bar');
 figs['basic_error_bar'] = require('@mocks/basic_error_bar');
