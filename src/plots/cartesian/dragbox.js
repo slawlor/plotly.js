@@ -37,6 +37,9 @@ var clearSelect = require('./select').clearSelect;
 var selectOnClick = require('./select').selectOnClick;
 var scaleZoom = require('./scale_zoom');
 
+var repositionPersistentSpikeLinesOnDrag = require('../../components/fx/hover').repositionPersistentSpikeLinesOnDrag;
+var cachedSpikeLinesPositions = require('../../components/fx/hover').cachedSpikeLinesPositions;
+
 var constants = require('./constants');
 var MINDRAG = constants.MINDRAG;
 var MINZOOM = constants.MINZOOM;
@@ -561,7 +564,9 @@ function makeDragBox(gd, plotinfo, x, y, w, h, ns, ew) {
                 dragAxList(yaxes, dy);
                 updateMatchedAxRange('y');
             }
-            updateSubplots([xActive ? -dx : 0, yActive ? -dy : 0, pw, ph]);
+            var viewBox = [xActive ? -dx : 0, yActive ? -dy : 0, pw, ph];
+            updateSpikeLines(gd, viewBox, xaxes, yaxes);
+            updateSubplots(viewBox);
             ticksAndAnnotations();
             gd.emit('plotly_relayouting', updates);
             return;
@@ -782,6 +787,7 @@ function makeDragBox(gd, plotinfo, x, y, w, h, ns, ew) {
         // be repositioning the data in the relayout. But DON'T call
         // ticksAndAnnotations again - it's unnecessary and would overwrite `updates`
         updateSubplots([0, 0, pw, ph]);
+        cacheSpikeLines(gd, xaxes, yaxes);
 
         // since we may have been redrawing some things during the drag, we may have
         // accumulated MathJax promises - wait for them before we relayout.
@@ -1250,6 +1256,14 @@ function hashValues(hash) {
     var out = [];
     for(var k in hash) out.push(hash[k]);
     return out;
+}
+
+function updateSpikeLines(gd, viewBox, xaxes, yaxes){    
+    repositionPersistentSpikeLinesOnDrag(gd, xaxes, yaxes, -viewBox[0], -viewBox[1]);    
+}
+
+function cacheSpikeLines(gd, xaxes, yaxes){
+    cachedSpikeLinesPositions(gd, xaxes, yaxes);
 }
 
 module.exports = {

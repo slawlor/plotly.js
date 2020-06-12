@@ -1899,14 +1899,37 @@ axes.drawOne = function(gd, ax, opts) {
     // tick labels - for now just the main labels.
     // TODO: mirror labels, esp for subplots
 
-    seq.push(function() {
-        return axes.drawLabels(gd, ax, {
-            vals: vals,
-            layer: mainAxLayer,
-            transFn: transFn,
-            labelFns: axes.makeLabelFns(ax, mainLinePosition)
-        });
-    });
+    if (axLetter === 'x'){
+        if (ax.subPlotsLabeled){
+            // Label all the sub plots.
+            var subPlots = ax._subplotsWith; 
+            for (var i = 0; i< subPlots.length; i ++){
+                var subPlotId = subPlots[i];
+                var yMatch = subPlotId.match(/y(\d)*$/);
+                if (yMatch === null || yMatch.length <= 0) continue;
+                var subAx = axes.getFromId(gd, yMatch[0], 'y');   
+                var subTransFn = axes.makeTransFn2(gd, ax, subAx);
+                var subPlotInfo = fullLayout._plots[subPlotId];
+                var subAxLayer = subPlotInfo[axLetter + 'axislayer'];
+                var opts = {
+                    vals: vals,
+                    layer: subAxLayer,
+                    transFn: subTransFn,
+                    labelFns: axes.makeLabelFns(ax, mainLinePosition)
+                };
+                seq.push(buildLabelingFunc(gd, ax, opts));
+            }
+        }
+    } else {
+        seq.push(function() {
+            return axes.drawLabels(gd, ax, {
+                vals: vals,
+                layer: mainAxLayer,
+                transFn: transFn,
+                labelFns: axes.makeLabelFns(ax, mainLinePosition)
+                });
+         });
+    }
 
     if(ax.type === 'multicategory') {
         var pad = {x: 2, y: 10}[axLetter];
@@ -2208,6 +2231,20 @@ axes.makeTransFn = function(ax) {
     var offset = ax._offset;
     return axLetter === 'x' ?
         function(d) { return 'translate(' + (offset + ax.l2p(d.x)) + ',0)'; } :
+        function(d) { return 'translate(0,' + (offset + ax.l2p(d.x)) + ')'; };
+};
+
+/**
+* Make axis translate transform function
+*/
+axes.makeTransFn2 = function(gd, ax, subAx) {
+    var axLetter = ax._id.charAt(0);
+    var offset = ax._offset;
+    return axLetter === 'x' ?
+        function(d) { 
+            var offSet = getLabelOffsetHeight(gd, ax._id, subAx._id, ax._mainLinePosition, d.fontSize, subAx._length);
+            return 'translate(' + (offset + ax.l2p(d.x)) + ',' + offSet + ')'; 
+        } :
         function(d) { return 'translate(0,' + (offset + ax.l2p(d.x)) + ')'; };
 };
 
@@ -3181,4 +3218,14 @@ function moveOutsideBreak(v, ax) {
         }
     }
     return v;
+}
+
+function getLabelOffsetHeight(gd, xAxisId, yAxisId, mainLinePosition, fontSize, plotHeight) {
+    var plotId = xAxisId + yAxisId;
+    var plotPositionY = gd._fullLayout._plots[plotId].plot[0][0].transform.animVal[0].matrix.f;
+    return (plotHeight + plotPositionY) - mainLinePosition - fontSize / 2;
+}
+
+function buildLabelingFunc(gd, ax, opts){
+    return function() { axes.drawLabels(gd, ax, opts); };
 }
