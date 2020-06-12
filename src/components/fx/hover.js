@@ -1752,7 +1752,6 @@ function createSpikelines(gd, closestPoints, opts) {
 
     var xValue = hLinePoint.xVal;
     var yValue = vLinePoint.yVal;
-    var pointNumber = vLinePoint.pointNumber;
 
     // Horizontal line (to y-axis)
     if(showY) {
@@ -1769,6 +1768,10 @@ function createSpikelines(gd, closestPoints, opts) {
             hLinePointX = xa._offset + hLinePoint.x;
             hLinePointY = ya._offset + hLinePoint.y;
         }
+
+        var yRange = ya._rl[1] - ya._rl[0];
+        var yRatio = 1 - ((yValue - ya._rl[0]) / yRange);
+        var y0Height = hLinePointY - (yRatio * ya._length);
 
         var dfltHLineColor = tinycolor.readability(hLinePoint.color, contrastColor) < 1.5 ?
             Color.contrast(contrastColor) : hLinePoint.color;
@@ -1806,7 +1809,7 @@ function createSpikelines(gd, closestPoints, opts) {
                     'stroke-dasharray': Drawing.dashStyle(ya.spikedash, yThickness),
                     px: xValue,
                     py: yValue,
-                    pNumber: pointNumber
+                    y0: y0Height
                 })
                 .classed('spikeline', true)
                 .classed(plotId, true)
@@ -1824,7 +1827,7 @@ function createSpikelines(gd, closestPoints, opts) {
                     stroke: contrastColor,
                     px: xValue,
                     py: yValue,
-                    pNumber: pointNumber
+                    y0: y0Height
                 })
                 .classed('spikeline', true)
                 .classed(plotId, true)
@@ -1840,8 +1843,7 @@ function createSpikelines(gd, closestPoints, opts) {
                     r: yThickness,
                     fill: yColor,
                     px: xValue,
-                    py: yValue,
-                    pNumber: pointNumber
+                    py: yValue
                 })
                 .classed('spikeline', true)
                 .classed(plotId, true)
@@ -1850,6 +1852,7 @@ function createSpikelines(gd, closestPoints, opts) {
     }
 
     if(showX) {
+        var vLinePoint = closestPoints.vLinePoint;
         var vLinePointX, vLinePointY;
 
         xa = vLinePoint && vLinePoint.xa;
@@ -1863,6 +1866,9 @@ function createSpikelines(gd, closestPoints, opts) {
             vLinePointX = xa._offset + vLinePoint.x;
             vLinePointY = ya._offset + vLinePoint.y;
         }
+        var xRange = xa._rl[1] - xa._rl[0];
+        var xRatio = (xValue - xa._rl[0]) / xRange;
+        var x0Width = vLinePointX - (xRatio * xa._length);
 
         var dfltVLineColor = tinycolor.readability(vLinePoint.color, contrastColor) < 1.5 ?
             Color.contrast(contrastColor) : vLinePoint.color;
@@ -1900,7 +1906,7 @@ function createSpikelines(gd, closestPoints, opts) {
                     'stroke-dasharray': Drawing.dashStyle(xa.spikedash, xThickness),
                     px: xValue,
                     py: yValue,
-                    pNumber: pointNumber
+                    x0 : x0Width
                 })
                 .classed('spikeline', true)
                 .classed(plotId, true)
@@ -1918,7 +1924,7 @@ function createSpikelines(gd, closestPoints, opts) {
                     stroke: contrastColor,
                     px: xValue,
                     py: yValue,
-                    pNumber: pointNumber
+                    x0 : x0Width
                 })
                 .classed('spikeline', true)
                 .classed(plotId, true)
@@ -1935,8 +1941,7 @@ function createSpikelines(gd, closestPoints, opts) {
                     r: xThickness,
                     fill: xColor,
                     px: xValue,
-                    py: yValue,
-                    pNumber: pointNumber
+                    py: yValue
                 })
                 .classed('spikeline', true)
                 .classed(plotId, true)
@@ -2014,28 +2019,27 @@ function repositionPersistentSpikeLinesOnDrag(gd, xaxes, yaxes, dx, dy){
 
     var xSpikes = [];
     var ySpikes = [];
-    var xSubPlots = []
-    var ySubPlots = []
+    var subPlots = []
 
     for(var i = 0; i < xaxes.length; i++){
-        xSubPlots.push.apply(xSubPlots, xaxes[i]._subplotsWith);
+        subPlots.push.apply(subPlots, xaxes[i]._subplotsWith);
     }
     for(var i = 0; i < yaxes.length; i++){
-        ySubPlots.push.apply(ySubPlots, yaxes[i]._subplotsWith);
+        subPlots.push.apply(subPlots, yaxes[i]._subplotsWith);
     }
 
-    xSubPlots = xSubPlots.filter(function(item, pos){
-      return xSubPlots.indexOf(item)== pos; 
+    subPlots = subPlots.filter(function(item, pos){
+      return subPlots.indexOf(item)== pos; 
     });
 
-    ySubPlots = ySubPlots.filter(function(item, pos){
-      return ySubPlots.indexOf(item)== pos; 
-    });
-
-    for(var i = 0; i < xSubPlots.length; i++){
-        var plotId = xSubPlots[i];
+    for(var i = 0; i < subPlots.length; i++){
+        var plotId = subPlots[i];
         var plot = gd._fullLayout._plots[plotId];
         var spikes = gd._fullLayout._hoverlayer.selectAll('.spikeline').filter('.'+ plotId);
+        var filteredXSpikes = spikes.filter('.'+plot.xaxis._name);
+        for(var index = 0; index < filteredXSpikes[0].length; index++){
+            xSpikes.push(filteredXSpikes[0][index]);
+        }  
 
         var filteredYSpikes = spikes.filter('.'+plot.yaxis._name);
         for(var index = 0; index < filteredYSpikes[0].length; index++){
@@ -2043,17 +2047,6 @@ function repositionPersistentSpikeLinesOnDrag(gd, xaxes, yaxes, dx, dy){
         }         
     }
 
-    for(var i = 0; i < ySubPlots.length; i++){
-        var plotId = ySubPlots[i];
-        var plot = gd._fullLayout._plots[plotId];
-        var spikes = gd._fullLayout._hoverlayer.selectAll('.spikeline').filter('.'+ plotId);
-
-        var filteredXSpikes = spikes.filter('.'+plot.xaxis._name);
-        for(var index = 0; index < filteredXSpikes[0].length; index++){
-            xSpikes.push(filteredXSpikes[0][index]);
-        }        
-    }
-    
     xSpikes = xSpikes.filter(function(item, pos){
       return xSpikes.indexOf(item)== pos; 
     });
@@ -2096,7 +2089,6 @@ function cachedSpikeLinesPositions(gd, xaxes, yaxes){
         var plot = gd._fullLayout._plots[plotId];
         // Assuming there is only 1 line per plot.
         var lineElem = plot.plot[0][0].querySelectorAll('.lines .js-line');
-        if (lineElem.length === 0 || lineElem[0] === undefined || lineElem[0] === null) continue;
         var isPointPresentInPlot = false;
         var traceChildNodes = lineElem[0].parentElement.parentElement.children;
         for (var i = 0; i < traceChildNodes.length; i++) {

@@ -501,6 +501,7 @@ function plotOne(gd, idx, plotinfo, cdscatter, cdscatterAll, element, transition
                 });
             });
         
+            // find proper condition here
         if (!hasTransition) updateSpikeLinesWithoutPoints(gd, xa, ya);
 
         join.exit().remove();
@@ -559,29 +560,28 @@ function selectMarkers(gd, idx, plotinfo, cdscatter, cdscatterAll) {
         if(Math.round((i + i0) % inc) === 0) v.vis = true;
     });
 }
-function updateSpikeLinesWithoutPoints(gd, xa, ya) {
-    if(gd === null || gd === undefined) return;
+function updateSpikeLinesWithoutPoints(gd, xa, ya){
+    if (gd === null || gd === undefined) return;
 
     var plotId = xa._id + ya._id;
     var plot = gd._fullLayout._plots[plotId];
 
     // Assuming there is only 1 line per plot.
     var lineElem = plot.plot[0][0].querySelectorAll('.lines .js-line');
-    if(lineElem.length === 0 || lineElem[0] === undefined || lineElem[0] === null) return;
     var isPointPresentInPlot = false;
     var traceChildNodes = lineElem[0].parentElement.parentElement.children;
-    for(var i = 0; i < traceChildNodes.length; i++) {
-        if(traceChildNodes[i].className === 'points') {
-            isPointPresentInPlot = traceChildNodes[i].children > 0;
-            break;
-        }
+    for (var i = 0; i < traceChildNodes.length; i++) {
+        if (traceChildNodes[i].className == "points") {
+          isPointPresentInPlot = traceChildNodes[i].children > 0;
+          break;
+        }        
     }
-    if(isPointPresentInPlot) return;
+    if (isPointPresentInPlot) return;
 
     var spikeLines = gd._fullLayout._hoverlayer.selectAll('.spikeline')
         .filter('.' + plotId);
 
-    if(spikeLines[0].length === 0) return;
+    if (spikeLines[0].length === 0) return;
 
     var xSpikeLines = spikeLines.filter('.' + xa._name);
     var ySpikeLines = spikeLines.filter('.' + ya._name);
@@ -590,7 +590,10 @@ function updateSpikeLinesWithoutPoints(gd, xa, ya) {
     var yRange = ya._rl[1] - ya._rl[0];
 
     var yaxisHeight = ya._length;
+    var yHeight = parseInt(xSpikeLines[0][0].getAttribute('y1'));
+
     var xaxisWidth = xa._length;
+    var xWidth = parseInt(ySpikeLines[0][0].getAttribute('x1'));
 
     var dy = 0;
     var dx = 0;
@@ -598,19 +601,16 @@ function updateSpikeLinesWithoutPoints(gd, xa, ya) {
     var previousDy = xSpikeLines[0][0].dy === undefined ? 0 : xSpikeLines[0][0].dy;
     var previousDx = ySpikeLines[0][0].dx === undefined ? 0 : ySpikeLines[0][0].dx;
 
-    var plotPositionMatrix = gd._fullLayout._plots[plotId].plot[0][0].transform.animVal[0].matrix;
-
     var py = xSpikeLines[0][0].getAttribute('py');
-    var pointNumber = xSpikeLines[0][0].getAttribute('pNumber');
     var yRatio = 1 - ((py - ya._rl[0]) / yRange);
-    var y0 = plotPositionMatrix.f;
+    var y0 = parseInt(xSpikeLines[0][0].getAttribute('y0'));
 
     var px = ySpikeLines[0][0].getAttribute('px');
     var xRatio = (px - xa._rl[0]) / xRange;
-    var x0 = plotPositionMatrix.e;
+    var x0 = parseInt(ySpikeLines[0][0].getAttribute('x0'));
 
     dy = (yRatio * yaxisHeight) + y0 - (parseInt(xSpikeLines[0][0].getAttribute('y1')) + previousDy);
     dx = (xRatio * xaxisWidth) + x0 - (parseInt(ySpikeLines[0][0].getAttribute('x1')) + previousDx);
 
-    Drawing.repositionPersistentSpikeLines(gd, px, py, pointNumber, dx, dy, xa, ya);
+    Drawing.repositionPersistentSpikeLines(gd, px, py, dx, dy, xa, ya);
 }
