@@ -10,7 +10,6 @@
 
 var Lib = require('../../lib');
 var Registry = require('../../registry');
-var removePlotSpikeLines = require('../fx/hover').removePlotSpikeLines;
 
 var SHOWISOLATETIP = true;
 
@@ -70,10 +69,6 @@ module.exports = function handleClick(g, gd, numClicks) {
 
     function setVisibility(fullTrace, visibility) {
         var fullInput = fullTrace._fullInput;
-        var plotId = fullTrace.xaxis + fullTrace.yaxis;
-        if (visibility == false || visibility === 'legendonly'){
-            removePlotSpikeLines(gd, plotId);
-        }
         if(Registry.hasTransform(fullInput, 'groupby')) {
             var kcont = carrs[fullInput.index];
             if(!kcont) {

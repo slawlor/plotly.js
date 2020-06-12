@@ -183,6 +183,6 @@ module.exports = function plot(gd, plotinfo, cdViolins, violinLayer) {
             );
         });
 
-        boxPlot.plotPoints(plotGroup, {x: xa, y: ya}, trace, t, gd);
+        boxPlot.plotPoints(plotGroup, {x: xa, y: ya}, trace, t);
     });
 };

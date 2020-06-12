@@ -14,8 +14,6 @@ var getGraphDiv = require('../../lib/dom').getGraphDiv;
 
 var hoverConstants = require('../fx/constants');
 
-var removeNonPersistentSpikeLines = require('../fx/hover').removeNonPersistentSpikeLines
-
 var unhover = module.exports = {};
 
 unhover.wrapped = function(gd, evt, subplot) {
@@ -42,8 +40,7 @@ unhover.raw = function raw(gd, evt) {
     }
 
     fullLayout._hoverlayer.selectAll('g').remove();
-    removeNonPersistentSpikeLines(gd);
-    //fullLayout._hoverlayer.selectAll('line').remove();
+    fullLayout._hoverlayer.selectAll('line').remove();
     fullLayout._hoverlayer.selectAll('circle').remove();
     gd._hoverdata = undefined;
 

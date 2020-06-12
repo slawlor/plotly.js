@@ -46,7 +46,7 @@ function plot(gd, plotinfo, cdbox, boxLayer) {
         }
 
         plotBoxAndWhiskers(plotGroup, {pos: posAxis, val: valAxis}, trace, t);
-        plotPoints(plotGroup, {x: xa, y: ya}, trace, t, gd);
+        plotPoints(plotGroup, {x: xa, y: ya}, trace, t);
         plotBoxMean(plotGroup, {pos: posAxis, val: valAxis}, trace, t);
     });
 }
@@ -143,7 +143,7 @@ function plotBoxAndWhiskers(sel, axes, trace, t) {
     });
 }
 
-function plotPoints(sel, axes, trace, t, gd) {
+function plotPoints(sel, axes, trace, t) {
     var xa = axes.x;
     var ya = axes.y;
     var bdPos = t.bdPos;
@@ -250,7 +250,7 @@ function plotPoints(sel, axes, trace, t, gd) {
 
     paths.exit().remove();
 
-    paths.call(Drawing.translatePoints, xa, ya, gd);
+    paths.call(Drawing.translatePoints, xa, ya);
 }
 
 function plotBoxMean(sel, axes, trace, t) {

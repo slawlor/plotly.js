@@ -32,13 +32,6 @@ module.exports = {
             'false'
         ].join(' ')
     },
-    spikePersistOnClick: {
-        valType: 'boolean',
-        dflt: false,
-        role: 'style',
-        editType: 'none',
-        description: 'Set rather if spike line should persist after clicking on the hover point'
-    },
     color: {
         valType: 'color',
         dflt: colorAttrs.defaultLine,
@@ -592,13 +585,6 @@ module.exports = {
         role: 'style',
         editType: 'none',
         description: 'Determines whether spikelines are stuck to the cursor or to the closest datapoints.'
-    },
-    subPlotsLabeled:{
-        valType: 'boolean',
-        dflt: false,
-        role: 'style',
-        editType: 'none',
-        description: 'Set rather if all subplots should have the axis labels, only works for x axis for now'
     },
     tickfont: fontAttrs({
         editType: 'ticks',
